@@ -2525,6 +2525,8 @@ function updateAuras(t) {
 }
 function makeBallMesh(skin = 'default') {
   const m = new THREE.Mesh(BALL_GEO, skinMaterial('default')); applySkin(m, skin); m.castShadow = true;
+  const mine = new THREE.Mesh(new THREE.SphereGeometry(BALL_R * 1.04, 20, 16), new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.6, depthWrite: false }));   // red shell: "your touch - wait for someone else to play it"
+  mine.name = 'mine'; mine.visible = false; m.add(mine);
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(BALL_R * 1.2, 16), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .35 })); shadow.rotation.x = -Math.PI / 2;
   return { mesh: m, shadow };
 }

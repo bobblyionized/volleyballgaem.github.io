@@ -3357,6 +3357,8 @@ function updateAuras(t) {
 }
 function makeBallMesh(skin = 'default') {
   const m = new THREE.Mesh(BALL_GEO, skinMaterial('default')); applySkin(m, skin); m.castShadow = true;
+  const mine = new THREE.Mesh(new THREE.SphereGeometry(BALL_R * 1.04, 20, 16), new THREE.MeshBasicMaterial({ color: 0xff2a2a, transparent: true, opacity: 0.6, depthWrite: false }));   // red shell: "your touch - wait for someone else to play it"
+  mine.name = 'mine'; mine.visible = false; m.add(mine);
   const shadow = new THREE.Mesh(new THREE.CircleGeometry(BALL_R * 1.2, 16), new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: .35 })); shadow.rotation.x = -Math.PI / 2;
   return { mesh: m, shadow };
 }
@@ -3938,6 +3940,7 @@ function updateBalls(dt) {
     if (b.visOff) { const k = Math.exp(-dt * 14); b.visOff.multiplyScalar(k); if (b.visOff.lengthSq() < 1e-6) b.visOff = null; }   // a network correction is eased out visually instead of popping
     b.mesh.position.copy(b.pos); if (b.visOff) b.mesh.position.add(b.visOff); if (!b.held) { b.mesh.rotation.x += b.spin.x * dt; b.mesh.rotation.y += b.spin.y * dt; b.mesh.rotation.z += b.spin.z * dt; }
     b.shadow.position.set(b.pos.x, 0.015, b.pos.z); b.shadow.material.opacity = clamp(0.45 - b.pos.y * 0.04, 0.08, 0.45);
+    const mine = b.mesh.getObjectByName('mine'); if (mine) mine.visible = !b.held && b.hitter === SID && b.hitType !== 'toss';   // the ball turns red while your touch was the last one
   }
   // local player contact actions (block / dive) against any reachable ball
   if (T < P.blockUntil && !P.blockHit && ballReach(highPos(), 1.6, 1, true) && B.hitter !== SID && B.vel.dot(cf()) < 0) blockContact();   // blocks may reach over the net
@@ -5072,7 +5075,8 @@ function botStep(bot, dt) {
   const cd = courtDims(); const sz = sideZ(bot.team);
   if (bot.target && bot.onGround) {
     const dx = bot.target.x - bot.pos.x, dz = bot.target.z - bot.pos.z; const d = Math.hypot(dx, dz);
-    if (d > 0.12) { const sp = Math.min(BOT_SPEED, d / dt); bot.vel.x = dx / d * sp; bot.vel.z = dz / d * sp; } else { bot.vel.x = bot.vel.z = 0; }
+    const top = bot.role === 'setter' || (bot.plan && bot.plan.startsWith('set')) ? BOT_SPEED * 1.3 : BOT_SPEED;   // setters are quick on their feet
+    if (d > 0.12) { const sp = Math.min(top, d / dt); bot.vel.x = dx / d * sp; bot.vel.z = dz / d * sp; } else { bot.vel.x = bot.vel.z = 0; }
   } else if (bot.onGround) { bot.vel.x = bot.vel.z = 0; }
   bot.vel.y -= G * dt;
   bot.pos.x += bot.vel.x * dt; bot.pos.z += bot.vel.z * dt; bot.pos.y += bot.vel.y * dt;
@@ -5084,7 +5088,7 @@ function botStep(bot, dt) {
   if (look) { const want = Math.atan2(look.x - bot.pos.x, look.z - bot.pos.z); let d = want - bot.ry; d = Math.atan2(Math.sin(d), Math.cos(d)); bot.ry += d * Math.min(1, dt * 12); }
   const r = bot.rig; r.root.position.copy(bot.pos); r.root.rotation.y = bot.ry; r.moveSpeed = bot.onGround && r.anim === 'idle' ? Math.hypot(bot.vel.x, bot.vel.z) : 0; r.update(dt, T);
 }
-function botJump(bot) { if (!bot.onGround) return; bot.vel.y = JUMP_V; bot.onGround = false; bot.rig.impact(0.14); bot.rig.base = 'air'; bot.rig.setPose('jumpUp', T + 0.18); }
+function botJump(bot, straight = false) { if (!bot.onGround) return; if (straight) { bot.vel.x = bot.vel.z = 0; } /* straight: no carry-over run, it goes up on the spot (sets and blocks) */ bot.vel.y = JUMP_V; bot.onGround = false; bot.rig.impact(0.14); bot.rig.base = 'air'; bot.rig.setPose('jumpUp', T + 0.18); }
 function botHit(bot, type, vel, g = 1) {
   const b = matchBall(); if (!b) return;
   b.vel.copy(vel); b.g = g; b.seq++; b.t = snow(); b.held = null; b.active = true; b.frozen = false; b.pf = null; b.acc = 0;
@@ -5206,8 +5210,8 @@ function planTeam(team, bots) {
       const hi = predictBall(b, { height: 3.3 }).atH;                                                   // where the ball comes down through jump-set height
       const at = hi || predictBall(b, { height: 2.1 }).atH; const under = at ? new V3(at.x, 0, at.z) : new V3(pred.land.x, 0, pred.land.z);
       if (st.onGround) { st.target = under.clone().addScaledVector(new V3(0, 0, sz), 0.25); st.face = new V3(b.pos.x, 0, b.pos.z); }
-      const wantJump = hi && dist2(st, under) < 0.7 && hi.t < 0.5 && b.pos.y > 3.0;                     // in position and the ball is half a second from the hands: go up
-      if (wantJump && st.onGround) botJump(st);
+      const wantJump = hi && dist2(st, under) < 0.5 && hi.t < 0.5 && b.pos.y > 3.0;                     // right under it and the ball is half a second from the hands: go straight up
+      if (wantJump && st.onGround) botJump(st, true);                                                    // too far to get under it in time: it stays down and sets the ball on the ground instead
       if (botMayTouch(st) && botReach(st, !st.onGround) && (!hi || !st.onGround || (b.vel.y < 0 && b.pos.y < 2.6))) {   // in the air: set at the top; on the ground only if it never got high enough
         let tg; if (pick === 'human') { const l = P.pos.distanceTo(spots.left), r = P.pos.distanceTo(spots.right); tg = (l < r ? spots.left : spots.right).clone(); }
         else { const hb = bots.find(x => x.id === pick); tg = hb ? hb.target.clone() : spots.left.clone(); }
@@ -5249,7 +5253,7 @@ function planTeam(team, bots) {
       if (blocker) {
         blocker.plan = 'block'; blocker.target = new V3(clamp(fx, -cd.w / 2 + 0.5, cd.w / 2 - 0.5), 0, sz * 0.9); blocker.face = new V3(fx, 0, -sz * 3);
         const attackerUp = !!attacker && attacker.up;                                                    // go up with the hitter (not with their setter's jump set)
-        if (attackerUp && blocker.onGround && Math.abs(blocker.pos.z) < 1.6) { blocker.blockTilt = (size <= 2 && Math.random() < 0.5) ? 1 : -1; botJump(blocker); blocker.blockUntil = T + 1.0; blocker.rig.base = 'block'; blocker.rig.setPose('block'); }   // 2s: kill block (W) or one-touch (S) 50/50; 3s+: bots only one-touch
+        if (attackerUp && blocker.onGround && Math.abs(blocker.pos.z) < 1.6) { blocker.blockTilt = (size <= 2 && Math.random() < 0.5) ? 1 : -1; botJump(blocker, true); blocker.blockUntil = T + 1.0; blocker.rig.base = 'block'; blocker.rig.setPose('block'); }   // 2s: kill block (W) or one-touch (S) 50/50; 3s+: bots only one-touch
       }
     }
     for (const bot of bots) {
