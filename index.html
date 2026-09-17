@@ -233,7 +233,7 @@ canvas#c.impact{filter:grayscale(1) brightness(1.05) contrast(60)}   /* hard bla
 /* queue panel */
 #queuePanel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:560px;max-width:94vw;background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:16px 18px 18px}
 #queuePanel h2{margin:0 0 12px;font-size:22px;font-weight:900;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
-#mapPick button.on{background:#fff;color:#111}
+#mapPick button.on,#playMode button.on{background:#fff;color:#111}
 #queuePanel .team{background:var(--bg2);border-radius:8px;padding:12px 14px;min-height:200px}
 #queuePanel .team h3{margin:0 0 10px;font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:#b9bfcc;border-bottom:2px solid var(--line);padding-bottom:6px}
 #queuePanel .mem{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.3);border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:16px;font-weight:800}
@@ -432,6 +432,7 @@ canvas#c.impact{filter:grayscale(1) brightness(1.05) contrast(60)}   /* hard bla
 
   <div id="queuePanel" class="hidden">
     <h2><span id="queueTitle">Queue - 2v2</span><button class="x" id="queueX">X</button></h2>
+    <div id="playMode" class="hidden" style="display:flex;gap:8px;align-items:center;margin-bottom:10px;font-weight:800;font-size:13px">PLAY <button class="btn small grey" data-pm="online">ONLINE</button><button class="btn small grey" data-pm="bots">BOTS</button></div>
     <div id="mapPick" class="hidden" style="display:flex;gap:8px;align-items:center;margin-bottom:10px;font-weight:800;font-size:13px">MAP <button class="btn small grey" data-map="indoor">INDOORS</button><button class="btn small grey" data-map="beach">BEACH</button></div>
     <div class="team"><h3>Your Team</h3><div id="teamList"></div></div>
     <div class="bottom">
@@ -4750,12 +4751,14 @@ function renderQueuePanel(pad, pd) {
   const isOwner = owner === SID;
   $('#lockToggle').textContent = pd.lock ? 'ON' : 'OFF'; $('#lockToggle').classList.toggle('on', !!pd.lock); $('#lockToggle').disabled = !isOwner;
   const qb = $('#queueBtn'); qb.disabled = !isOwner; qb.textContent = isOwner ? (pad.practice ? 'START' : 'QUEUE') : 'WAITING FOR LEADER';
+  $('#playMode').classList.toggle('hidden', !!pad.practice); $$('#playMode button').forEach(b => b.classList.toggle('on', b.dataset.pm === botPlay)); if (isOwner && !pad.practice) qb.textContent = botPlay === 'bots' ? 'PLAY VS BOTS' : 'QUEUE';
   $('#mapPick').classList.toggle('hidden', !pad.practice); const curMap = pd.map || 'indoor'; $$('#mapPick button').forEach(b => { b.classList.toggle('on', b.dataset.map === curMap); b.disabled = !isOwner; });
 }
 $('#lockToggle').onclick = () => { if (!S.padId) return; const pd = padsData[S.padId] || {}; if (padOwner(pd) !== SID) return; if (!S.online) { toast('Offline', 'err'); return; } db.ref(`pads/${S.padId}/lock`).set(!pd.lock); };
 $$('#mapPick button').forEach(b => b.onclick = () => { if (!S.padId) return; const pd = padsData[S.padId] || {}; if (padOwner(pd) !== SID) return; if (S.online) db.ref(`pads/${S.padId}/map`).set(b.dataset.map); else { pd.map = b.dataset.map; renderQueuePanel(PADS[S.padId], pd); } });
 $('#queueX').onclick = () => { leavePad(true); closePanels(); };
-$('#queueBtn').onclick = () => { if (!S.padId) return; const pad = PADS[S.padId], pd = padsData[S.padId] || {}; if (padOwner(pd) !== SID) return; if (pad.practice) startPractice(pad, pd); else startQueue(pad, pd); };
+$('#queueBtn').onclick = () => { if (!S.padId) return; const pad = PADS[S.padId], pd = padsData[S.padId] || {}; if (padOwner(pd) !== SID) return; if (pad.practice) startPractice(pad, pd); else if (botPlay === 'bots') startBotMatch(pad); else startQueue(pad, pd); };
+$$('#playMode button').forEach(b => b.onclick = () => { botPlay = b.dataset.pm; if (S.padId) renderQueuePanel(PADS[S.padId], padsData[S.padId] || {}); });
 
 async function startPractice(pad, pd) {
   const players = {}; for (const sid in (pd.players || {})) players[sid] = { name: pd.players[sid].name, id: pd.players[sid].id };
@@ -4876,10 +4879,10 @@ function endPoint(winner, msg) {
 function onStateChange(st) {
   const M = S.match, b = matchBall(); if (!M) return; const prev = M.state; M.state = st;
   if (st === 'point') { P.serving = false; if (P.holding) { P.holding = false; P.serveMode = false; P.serveAim = null; if (b) b.held = null; P.rig.base = 'idle'; P.rig.setPose('idle'); } }
-  if (st === 'serve') { P.serving = false; if (b) { b.active = false; b.held = null; b.frozen = false; } if (!M.practice && prev !== st) resetToSpawn(); P.holding = false; P.serveMode = false; P.serveAim = null; if (P.rig.base === 'hold') { P.rig.base = 'idle'; P.rig.setPose('idle'); } }
+  if (st === 'serve') { if (M.bots) botsOnServe(); P.serving = false; if (b) { b.active = false; b.held = null; b.frozen = false; } if (!M.practice && prev !== st) resetToSpawn(); P.holding = false; P.serveMode = false; P.serveAim = null; if (P.rig.base === 'hold') { P.rig.base = 'idle'; P.rig.setPose('idle'); } }
   if (st === 'over' && prev !== 'over') {
     const winner = (M.score.A > M.score.B) ? 'A' : 'B'; const won = teamOf(SID) === winner;
-    if (!M.practice) { addDollars(won ? 150 : 50); toast(won ? 'Victory! +$150' : 'Defeat. +$50', won ? 'ok' : 'err', 5000); }
+    if (!M.practice) { const w = M.bots ? 50 : 150, l = M.bots ? 20 : 50; addDollars(won ? w : l); toast(won ? 'Victory! +$' + w : 'Defeat. +$' + l, won ? 'ok' : 'err', 5000); }
     setTimeout(() => { if (S.match && S.match.id === M.id) leaveMatch(); }, 6000);
   }
 }
@@ -4972,6 +4975,7 @@ function hostCheckServer() {
 }
 function leaveMatch() {
   const M = S.match; if (!M) return;
+  BOTS.length = 0;
   matchUnsubs.forEach(f => f()); matchUnsubs = [];
   if (!M.local && S.online) {
     const r = db.ref('matches/' + M.id); const pref = r.child('players/' + SID); pref.onDisconnect().cancel(); pref.remove().then(() => r.child('players').once('value')).then(s => { if (!s.exists()) r.remove(); });
@@ -5005,6 +5009,270 @@ function updateMatchHud() {
 }
 
 /* =====================================================================
+   BOTS: local casual matches against (and alongside) computer players
+   ---------------------------------------------------------------------
+   A bot match is a local match (no server): the ball, the scoring and the serve clock all run here.
+   Bots are simple bodies (position, velocity, jump) driving a Rig, registered in `remotes` so the
+   name tags and other systems treat them like players. Each team runs one plan per frame:
+     receive  - the bot nearest the predicted landing runs there and sets the ball up to the setter spot
+     set      - the setter (2s: whoever did not receive; 3s+: a dedicated setter) puts the ball on a hitter's spot at the antenna (or the middle in 6s)
+     attack   - the hitter runs under the set, jumps in time and spikes to one of six spots (or tips), facing where it hits; a bad set becomes a lob (TOO LOW)
+     defend   - back to base; once the other side has two touches the nearest bot fronts the attacker at the net and jumps with them to block
+   Bots on your team follow the same plan; on defence a teammate flips a coin between blocking and receiving, and when you receive it sets to the antenna nearest you.
+   ===================================================================== */
+const BOTS = [];
+const BOT_NAMES = [['Bob', 'boy'], ['Greg', 'boy'], ['Emily', 'girl'], ['Dave', 'boy'], ['Sarah', 'girl'], ['Karen', 'girl'], ['Steve', 'boy'], ['Linda', 'girl'], ['Kevin', 'boy'], ['Jenny', 'girl'], ['Frank', 'boy'], ['Nancy', 'girl']];
+const BOT_SPEED = 6.6, BOT_REACH_G = 1.6, BOT_REACH_A = 1.7;
+const sideZ = team => team === 'A' ? -1 : 1;                              // which way is "our side" along z (the net is at z = 0)
+let botPlay = 'online';                                                   // the queue panel's ONLINE / BOTS choice
+function botTeamOf(id) { const b = BOTS.find(x => x.id === id); return b ? b.team : null; }
+
+function makeBot(id, name, model, team, idx, n) {
+  const rig = new Rig(TEAM_VARIANT[team], model); scene.add(rig.root);
+  const tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = name; $('#tags').appendChild(tag);
+  const bot = { id, name, model, team, idx, n, rig, tag, pos: spawnPos(team, idx, n), vel: new V3(), onGround: true, ry: team === 'A' ? 0 : Math.PI, target: null, face: null, role: 'player', plan: null, jumpAt: 0, blockUntil: 0, lastHitT: -9, serveAt: 0, coin: 0, base: null };
+  bot.base = bot.pos.clone(); rig.root.position.copy(bot.pos); rig.root.rotation.y = bot.ry; rig.setPose('idle'); rig.snap();
+  remotes.set(id, { rig, tag, name, buf: [], data: { team, name }, speed: 0, stamp: null, gap: 0.09, jit: 0, delay: 0.18, lastArrive: 0, ptx: null, pty: 0, ptz: 0 });   // empty buffer: updateRemotes leaves it to us, projectTags draws the tag
+  return bot;
+}
+function startBotMatch(pad) {
+  const size = pad.cap; const map = size === 2 ? 'beach' : 'indoor';
+  const names = BOT_NAMES.slice().sort(() => Math.random() - 0.5);
+  const teams = { A: { [SID]: { name: me.name } }, B: {} }; const players = {}; const spec = [];
+  for (let i = 1; i < size; i++) { const id = 'bot_a' + i; const [nm, md] = names.pop(); teams.A[id] = { name: nm }; players[id] = { name: nm, team: 'A' }; spec.push([id, nm, md, 'A']); }
+  for (let i = 0; i < size; i++) { const id = 'bot_b' + i; const [nm, md] = names.pop(); teams.B[id] = { name: nm }; players[id] = { name: nm, team: 'B' }; spec.push([id, nm, md, 'B']); }
+  leavePad(false); closePanels();
+  beginMatch({ id: 'bots', mode: size + 'v' + size, practice: false, bots: true, local: true, map, teams, players, score: { A: 0, B: 0 }, state: 'serve', serve: { team: Math.random() < 0.5 ? 'A' : 'B', sid: null }, serveIdx: { A: -1, B: -1 }, msg: '', serveAt: snow() });
+  BOTS.length = 0;
+  for (const [id, nm, md, team] of spec) { const mates = Object.keys(teams[team]).sort(); BOTS.push(makeBot(id, nm, md, team, mates.indexOf(id), mates.length)); }
+  if (size >= 3) for (const team of ['A', 'B']) { const first = BOTS.find(x => x.team === team); if (first) first.role = 'setter'; }   // 3s and up: one bot on each side only sets and blocks
+  const M = S.match; const t = M.serve.team; const members = Object.keys(M.teams[t]).sort(); M.serve.sid = members[0]; M.serveIdx[t] = 0;
+  botsOnServe(); $('#modeTxt').textContent = M.mode.toUpperCase() + ' vs BOTS';
+  toast('Bot match: ' + (size === 2 ? 'beach' : 'indoor') + ' court', 'ok');
+}
+/* ---- ball prediction (same physics as simBall, without the nets) ---- */
+function predictBall(b, opts = {}) {
+  const pos = b.pos.clone(), vel = b.vel.clone(), g = BALL_G * b.g; let t = 0; const h = 1 / 60; const wantH = opts.height; let atH = null;
+  while (t < 6) {
+    vel.y -= g * h; vel.multiplyScalar(1 - 0.015 * h); pos.addScaledVector(vel, h); t += h;
+    if (wantH !== undefined && atH === null && vel.y < 0 && pos.y <= wantH) atH = { x: pos.x, z: pos.z, y: pos.y, t };
+    if (pos.y <= BALL_R) break;
+  }
+  return { land: { x: pos.x, z: pos.z, t }, atH };
+}
+/* ---- one bot's body ---- */
+function botStep(bot, dt) {
+  const cd = courtDims(); const sz = sideZ(bot.team);
+  if (bot.target && bot.onGround) {
+    const dx = bot.target.x - bot.pos.x, dz = bot.target.z - bot.pos.z; const d = Math.hypot(dx, dz);
+    if (d > 0.12) { const sp = Math.min(BOT_SPEED, d / dt); bot.vel.x = dx / d * sp; bot.vel.z = dz / d * sp; } else { bot.vel.x = bot.vel.z = 0; }
+  } else if (bot.onGround) { bot.vel.x = bot.vel.z = 0; }
+  bot.vel.y -= G * dt;
+  bot.pos.x += bot.vel.x * dt; bot.pos.z += bot.vel.z * dt; bot.pos.y += bot.vel.y * dt;
+  const zMin = sz < 0 ? -cd.l / 2 - 2.5 : 0.5, zMax = sz < 0 ? -0.5 : cd.l / 2 + 2.5;                    // never through the net, a little room behind the line to serve
+  bot.pos.z = clamp(bot.pos.z, zMin, zMax); bot.pos.x = clamp(bot.pos.x, -cd.w / 2 - 1.5, cd.w / 2 + 1.5);
+  if (bot.pos.y <= 0) { if (!bot.onGround) { bot.rig.setPose('land', T + 0.16); bot.rig.impact(-0.17); bot.rig.base = 'idle'; } bot.pos.y = 0; bot.vel.y = 0; bot.onGround = true; bot.blockUntil = 0; }
+  // facing: the point it is looking at, else where it runs
+  const look = bot.face || (bot.onGround && Math.hypot(bot.vel.x, bot.vel.z) > 0.5 ? new V3(bot.pos.x + bot.vel.x, 0, bot.pos.z + bot.vel.z) : null);
+  if (look) { const want = Math.atan2(look.x - bot.pos.x, look.z - bot.pos.z); let d = want - bot.ry; d = Math.atan2(Math.sin(d), Math.cos(d)); bot.ry += d * Math.min(1, dt * 12); }
+  const r = bot.rig; r.root.position.copy(bot.pos); r.root.rotation.y = bot.ry; r.moveSpeed = bot.onGround && r.anim === 'idle' ? Math.hypot(bot.vel.x, bot.vel.z) : 0; r.update(dt, T);
+}
+function botJump(bot) { if (!bot.onGround) return; bot.vel.y = JUMP_V; bot.onGround = false; bot.rig.impact(0.14); bot.rig.base = 'air'; bot.rig.setPose('jumpUp', T + 0.18); }
+function botHit(bot, type, vel, g = 1) {
+  const b = matchBall(); if (!b) return;
+  b.vel.copy(vel); b.g = g; b.seq++; b.t = snow(); b.held = null; b.active = true; b.frozen = false; b.pf = null; b.acc = 0;
+  b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = bot.id; b.hitType = type; b.fx = 'none'; b.hm = bot.model; b.hitterPos = { x: bot.pos.x, z: bot.pos.z };
+  if (type === 'block') { b.touches = 0; b.sideTeam = bot.team; } else { if (b.sideTeam !== bot.team) { b.sideTeam = bot.team; b.touches = 1; } else b.touches++; }
+  b.serve = false; b.spin.set(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(vel.length() * 0.4); b.landed = false; b.ds = false;
+  if (type === 'spike') sparkle(b.pos, 12, 0xffffff, 1.4, 0.6, 0.35, 0.07, vel.clone().normalize());
+  const fwd = new V3(Math.sin(bot.ry), 0, Math.cos(bot.ry));
+  if (type === 'bump') { bot.rig.setPose('bump', T + 0.45); setTimeout(() => actionFx('bump', bot.rig, fwd), 60); }
+  else if (type === 'set') { bot.rig.setPose('set', T + 0.45); if (!bot.onGround) bot.rig.base = 'airDown'; setTimeout(() => actionFx('set', bot.rig, fwd), 80); }
+  else if (type === 'spike' || type === 'tip') { bot.rig.setPose(type === 'tip' ? 'tip' : 'spikeHit', T + 0.4); bot.rig.base = 'airDown'; actionFx('spike', bot.rig, fwd); }
+  bot.lastHitT = T; bot.plan = null;
+  hostCheckHit();
+}
+const botReach = (bot, high) => { const b = matchBall(); if (!b || !b.active || b.held || b.frozen) return false; const c = bot.pos.clone().add(new V3(0, high ? 2.0 : 1.05, 0)); const d = b.pos.distanceTo(c); return high ? d < BOT_REACH_A : d < BOT_REACH_G; };
+const botMayTouch = bot => { const b = matchBall(); return b && b.hitter !== bot.id && T - bot.lastHitT > 0.35; };
+/* ---- spots on the court ---- */
+function attackSpots(team) {                    // where hitters wait: the two antennas, plus the middle
+  const cd = courtDims(); const sz = sideZ(team); const x = cd.w / 2 - 0.7;
+  return { left: new V3(-x, 0, sz * 2.0), right: new V3(x, 0, sz * 2.0), middle: new V3(0.9 * -sz, 0, sz * 1.6) };
+}
+function setterSpot(team) { const cd = courtDims(); return new V3(1.2 * sideZ(team), 0, sideZ(team) * 2.2); }
+function humanOnTeam(team) { return P.team === team; }
+/* ---- spike targets: six ways to hit ---- */
+function spikeTarget(kind, team, from) {
+  const cd = courtDims(); const ez = -sideZ(team); const hx = cd.w / 2 - 0.9, hl = cd.l / 2 - 1.0;
+  const dirX = from.x >= 0 ? 1 : -1;                                                                     // "cut" and "straight" depend on which antenna you hit from
+  switch (kind) {
+    case 'leftCorner': return new V3(-hx, 0, ez * hl);
+    case 'rightCorner': return new V3(hx, 0, ez * hl);
+    case 'middleLong': return new V3(0, 0, ez * hl);
+    case 'cut': return new V3(-dirX * hx, 0, ez * 2.2);                                                  // sharp cross court, just past the net
+    case 'straight': return new V3(from.x, 0, ez * (hl - 1.5));
+    default: return new V3(from.x * 0.4, 0, ez * 2.0);                                                    // tip
+  }
+}
+function botSpike(bot) {
+  const b = matchBall(); const kinds = ['leftCorner', 'rightCorner', 'middleLong', 'cut', 'straight', 'tip']; const kind = kinds[Math.floor(Math.random() * kinds.length)];
+  const tg = spikeTarget(kind, bot.team, bot.pos); bot.face = tg.clone();
+  const contactY = b.pos.y;
+  if (contactY < NET_H - 0.25) {                                                                           // too low: lob it over instead of into the tape
+    const over = new V3(tg.x, 0, -sideZ(bot.team) * 4.5); botHit(bot, 'spike', launchTo(b.pos, over, Math.max(b.pos.y + 4.0, NET_H + 3.0)), 1); showBallMsg('TOO LOW', b.pos); return;
+  }
+  if (kind === 'tip') { botHit(bot, 'tip', launchTo(b.pos, tg, Math.max(b.pos.y + 0.4, NET_H + 0.5)), 1); return; }
+  const power = 0.5 + Math.random() * 0.5;                                                                // 50-100%
+  const gm = 1.4 + 2.2 * power; const apex = Math.max(b.pos.y + 0.25, NET_H + 0.55);
+  botHit(bot, 'spike', launchTo(b.pos, tg, apex, BALL_G * gm), gm);
+}
+/* ---- serving ---- */
+function botsOnServe() {                        // a serve state just began: everyone to base, the serving bot behind its line
+  const M = S.match; if (!M || !M.bots) return;
+  for (const bot of BOTS) { bot.plan = null; bot.target = bot.base.clone(); bot.face = new V3(bot.pos.x, 0, 0); bot.pos.copy(bot.base); bot.vel.set(0, 0, 0); bot.onGround = true; bot.pos.y = 0; bot.rig.base = 'idle'; bot.rig.setPose('idle'); bot.coin = Math.random(); bot.blockUntil = 0; }
+  const s = M.serve && BOTS.find(x => x.id === M.serve.sid);
+  if (s) { const cd = courtDims(); s.pos.set(clamp(s.base.x, -cd.w / 2 + 1, cd.w / 2 - 1), 0, sideZ(s.team) * (cd.l / 2 + 1.4)); s.target = null; s.serveAt = T + 1.6 + Math.random() * 0.8; }
+}
+function botServe(bot) {
+  const M = S.match, b = matchBall(); const cd = courtDims(); const ez = -sideZ(bot.team);
+  b.active = true; b.frozen = false; b.held = null; b.pos.copy(bot.pos).add(new V3(0, 1.1, 0)).addScaledVector(new V3(0, 0, ez), 0.4); b.hitter = null; b.hitType = null; b.prevHitter = null; b.touches = 0; b.sideTeam = bot.team; b.serve = false; b.tossedBy = null; b.landed = false; b.vel.set(0, 0, 0);
+  const tg = new V3((Math.random() - 0.5) * cd.w * 0.7, 0, ez * (cd.l / 4 + Math.random() * cd.l / 4));       // deep-ish, somewhere in their court
+  bot.face = tg.clone();
+  botHit(bot, 'bump', launchTo(b.pos, tg, Math.max(NET_H + 2.2, 5.6)), 1);                             // a bump serve that clears the net
+  mwrite('state', 'rally');
+}
+/* ---- the plans ---- */
+function planTeam(team, bots) {
+  const M = S.match, b = matchBall(); if (!b) return;
+  const cd = courtDims(); const sz = sideZ(team); const human = humanOnTeam(team);
+  const pred = predictBall(b); const incoming = Math.sign(pred.land.z) === sz || (b.pos.z * sz > 0 && b.vel.z * sz >= 0);
+  const oursTouches = b.sideTeam === team ? b.touches : 0;
+  const mates = bots.slice(); const size = mates.length + (human ? 1 : 0);
+  const setter = size >= 3 ? (bots.find(x => x.role === 'setter') || bots[0]) : null;   // 3s+: one bot only sets and blocks
+  const spots = attackSpots(team);
+  const dist2 = (bot, p) => Math.hypot(bot.pos.x - p.x, bot.pos.z - p.z);
+  if (!b.active || M.state !== 'rally') { for (const bot of bots) bot.target = bot.base.clone(); return; }
+  if (incoming && oursTouches < 3) {
+    /* ---------- we have (or are about to have) the ball ---------- */
+    if (oursTouches === 0) {                                                                            // RECEIVE: nearest to the landing (not the setter) runs there and sets it up
+      const land = new V3(pred.land.x, 0, pred.land.z);
+      const cands = bots.filter(x => x !== setter || bots.length === 1);
+      const recv = cands.reduce((a, x) => dist2(x, land) < dist2(a, land) ? x : a, cands[0]);
+      for (const bot of bots) {
+        if (bot === recv) { bot.target = land.clone().addScaledVector(new V3(0, 0, sz), 0.35); bot.face = new V3(b.pos.x, 0, b.pos.z); bot.plan = 'receive'; }
+        else if (bot === setter || (!setter && bots.length > 1)) { bot.target = setterSpot(team); bot.plan = 'setter'; bot.face = new V3(b.pos.x, 0, b.pos.z); }
+        else { bot.target = bot.base.clone(); bot.plan = 'wait'; }
+      }
+      if (botReach(recv, false) && botMayTouch(recv) && (b.vel.y < 1 || b.pos.y < 1.6)) {              // touch 1: up to the setter spot
+        const tg = setterSpot(team); recv.face = tg.clone();
+        botHit(recv, b.pos.y < 1.0 ? 'bump' : 'set', launchTo(b.pos, tg, Math.max(6.0, b.pos.y + 3.0)), 1);
+        recv.plan = 'toAntenna'; recv.target = (recv.pos.x < 0 ? spots.left : spots.right).clone();
+      }
+    } else if (oursTouches === 1) {                                                                     // SET: the setter goes under the ball and puts it on a hitter
+      const st = setter || bots.find(x => x.id !== b.hitter);
+      if (!st) {                                                                                          // the only bot just received: the human must set, so it runs to an antenna and waits
+        for (const bot of bots) { bot.plan = 'hitter'; bot.target = (bot.pos.x < 0 ? spots.left : spots.right).clone(); bot.face = new V3(b.pos.x, 0, b.pos.z); }
+        return;
+      }
+      const hitters = bots.filter(x => x !== st && x.id !== b.hitter);
+      // choose the hitter now (sticky per rally): a bot at an antenna / the middle, or the human if they are up front
+      if (!st.plan || !st.plan.startsWith('set:')) {
+        let pick = null;
+        if (human && b.hitter !== SID && Math.abs(P.pos.z) < cd.l / 2 && Math.abs(P.pos.z) > 0.3 && Math.random() < 0.55) pick = 'human';
+        else if (hitters.length) pick = hitters[Math.floor(Math.random() * hitters.length)].id;
+        else if (human) pick = 'human';
+        st.plan = 'set:' + pick;
+      }
+      const pick = st.plan.slice(4);
+      // hitters spread to different spots; in 6s two antennas, a middle, the rest stay back
+      const order = ['left', 'right', 'middle']; let k = 0;
+      for (const bot of bots) {
+        if (bot === st) continue;
+        if (bot.id === b.hitter && bots.length <= 2) { bot.target = (bot.pos.x < 0 ? spots.left : spots.right).clone(); bot.plan = 'hitter'; continue; }
+        if (k < 3 && (size <= 3 || k < 3)) { bot.target = spots[order[k++]].clone(); bot.plan = 'hitter'; } else { bot.target = bot.base.clone(); bot.plan = 'wait'; }
+      }
+      const at = predictBall(b, { height: 2.1 }).atH; const under = at ? new V3(at.x, 0, at.z) : new V3(pred.land.x, 0, pred.land.z);
+      st.target = under.clone().addScaledVector(new V3(0, 0, sz), 0.25); st.face = new V3(b.pos.x, 0, b.pos.z);
+      const wantJump = at && at.y > 2.2 && dist2(st, under) < 0.8 && b.vel.y < 0 && b.pos.y < 3.4 && b.pos.y > 2.4;
+      if (wantJump && st.onGround) botJump(st);
+      if (botMayTouch(st) && (botReach(st, !st.onGround) )) {
+        let tg; if (pick === 'human') { const l = P.pos.distanceTo(spots.left), r = P.pos.distanceTo(spots.right); tg = (l < r ? spots.left : spots.right).clone(); }
+        else { const hb = bots.find(x => x.id === pick); tg = hb ? hb.target.clone() : spots.left.clone(); }
+        tg.addScaledVector(new V3(0, 0, sz), 0.4); st.face = tg.clone();
+        botHit(st, 'set', launchTo(b.pos, tg, Math.max(5.6, b.pos.y + 2.4)), 1);
+        st.plan = 'setter'; st.target = setterSpot(team);
+      }
+    } else {                                                                                            // ATTACK: whoever is expected to hit runs under the set, jumps in time and swings
+      let hitter = null;
+      const spikeAt = predictBall(b, { height: 2.95 }).atH;
+      const aim = spikeAt ? new V3(spikeAt.x, 0, spikeAt.z) : new V3(pred.land.x, 0, pred.land.z);
+      const cands = bots.filter(x => x.id !== b.hitter && x !== setter);
+      if (cands.length) hitter = cands.reduce((a, x) => dist2(x, aim) < dist2(a, aim) ? x : a, cands[0]);
+      if (!hitter && human) hitter = null;                                                              // the human's ball
+      for (const bot of bots) { if (bot !== hitter) { bot.target = bot === setter ? setterSpot(team) : bot.base.clone(); bot.plan = 'wait'; } }
+      if (hitter) {
+        hitter.plan = 'attack'; hitter.target = aim.clone().addScaledVector(new V3(0, 0, sz), 0.45); hitter.face = new V3(b.pos.x, 0, b.pos.z);
+        const tLeft = spikeAt ? spikeAt.t : pred.land.t;
+        if (hitter.onGround && spikeAt && tLeft < 0.62 && dist2(hitter, aim) < 1.2) botJump(hitter);
+        if (!hitter.onGround && botReach(hitter, true) && botMayTouch(hitter) && b.vel.y < 2) botSpike(hitter);
+        else if (hitter.onGround && !spikeAt && botReach(hitter, false) && botMayTouch(hitter) && b.pos.y < 1.7) {   // set never got up: shovel it over
+          const over = new V3(0, 0, -sz * 5); botHit(hitter, 'bump', launchTo(b.pos, over, Math.max(NET_H + 2, b.pos.y + 3)), 1);
+        }
+      }
+    }
+  } else {
+    /* ---------- they have the ball: defend ---------- */
+    const theirs = b.sideTeam !== team ? b.touches : 0;
+    let blocker = null;
+    if (theirs >= 2 && b.pos.z * sz < 0) {                                                              // they have set: front the attacker
+      // the attacker: the human on their side if it is not who just hit, else their nearest bot to the ball
+      let attackerPos = null;
+      if (!human && b.hitter !== SID) attackerPos = P.pos;
+      else { const theirBots = BOTS.filter(x => x.team !== team && x.id !== b.hitter); if (theirBots.length) attackerPos = theirBots.reduce((a, x) => x.pos.distanceTo(b.pos) < a.pos.distanceTo(b.pos) ? x : a, theirBots[0]).pos; }
+      const netX = predictBall(b, { height: 2.9 }).atH; const fx = netX ? netX.x : (attackerPos ? attackerPos.x : b.pos.x);
+      const cands = bots.filter(x => !(human && x.coin < 0.5 && bots.length === 1));                      // a lone teammate flips a coin: block or dig
+      if (cands.length) blocker = cands.reduce((a, x) => Math.abs(x.pos.x - fx) < Math.abs(a.pos.x - fx) ? x : a, cands[0]);
+      if (blocker) {
+        blocker.plan = 'block'; blocker.target = new V3(clamp(fx, -cd.w / 2 + 0.5, cd.w / 2 - 0.5), 0, sz * 0.9); blocker.face = new V3(fx, 0, -sz * 3);
+        const attackerUp = (attackerPos === P.pos) ? !P.onGround : BOTS.some(x => x.team !== team && !x.onGround);
+        if (attackerUp && blocker.onGround && Math.abs(blocker.pos.z) < 1.6) { botJump(blocker); blocker.blockUntil = T + 1.0; blocker.rig.base = 'block'; blocker.rig.setPose('block'); }
+      }
+    }
+    for (const bot of bots) {
+      if (bot === blocker) continue;
+      if (bot.plan === 'block' && bot.onGround) bot.plan = 'wait';
+      // a lone teammate that chose to dig, or anyone when the ball is coming down on our side: go to the landing spot
+      const land = new V3(pred.land.x, 0, pred.land.z);
+      if (Math.sign(land.z) === sz && !incoming) { bot.target = land.clone().addScaledVector(new V3(0, 0, sz), 0.4); bot.plan = 'dig'; }
+      else { bot.target = bot === setter ? setterSpot(team) : bot.base.clone(); bot.plan = 'wait'; }
+      bot.face = new V3(b.pos.x, 0, b.pos.z);
+    }
+  }
+}
+function botBlockContacts() {                    // a ball coming over the tape within reach of a jumping blocker goes straight back
+  const b = matchBall(); if (!b || !b.active) return;
+  for (const bot of BOTS) {
+    const sz = sideZ(bot.team);
+    if (bot.onGround || T >= bot.blockUntil || b.hitter === bot.id || b.vel.z * sz <= 0 || b.pos.z * sz > 0.6 || b.pos.z * sz < -0.9) continue;
+    const hands = bot.pos.clone().add(new V3(0, 2.35, 0)); if (b.pos.distanceTo(hands) > 1.15 || b.pos.y < NET_H - 0.3) continue;
+    const tg = new V3(bot.pos.x + (Math.random() - 0.5) * 3, 0, -sz * (2 + Math.random() * 3)); bot.face = tg.clone();
+    botHit(bot, 'block', launchTo(b.pos, tg, b.pos.y + 0.6, BALL_G * 1.6), 1.6); bot.blockUntil = 0;
+  }
+}
+function updateBots(dt) {
+  const M = S.match; if (!M || !M.bots || !BOTS.length) return;
+  if (M.state === 'serve') {
+    const s = M.serve && BOTS.find(x => x.id === M.serve.sid);
+    if (s && s.serveAt && T >= s.serveAt) { s.serveAt = 0; botServe(s); }
+    for (const bot of BOTS) if (bot !== s) bot.target = bot.base.clone();
+  } else if (M.state === 'rally') {
+    botBlockContacts();
+    for (const team of ['A', 'B']) planTeam(team, BOTS.filter(x => x.team === team));
+  } else { for (const bot of BOTS) { bot.target = bot.base.clone(); bot.plan = null; } }
+  for (const bot of BOTS) botStep(bot, dt);
+}
+
+/* =====================================================================
    MAIN LOOP (fixed timestep, keeps simulating while the tab is hidden)
    ===================================================================== */
 const FIXED = 1 / 60;
@@ -5012,6 +5280,7 @@ let last = performance.now(), acc = 0;
 function simulate(dt) {
   T += dt;
   updatePlayer(dt); P.rig.update(dt, T);
+  updateBots(dt);
   updateBalls(dt); updateRemotes(dt); checkPads();
   WATER_T.value = T;                                                          // both maps' sea share one clock
   if (ULTRA) { if (S.scene === 'lobby') updateWind(); }                                  // ultra low: scenery stands still (wind still blows for the ball)
