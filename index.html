@@ -3593,19 +3593,23 @@ function finishSet(vel, g) {                     // every set (ground, jump, 4th
   hitBall('set', vel, g);
 }
 function doBlock() { P.airUsed = true; P.airActed = true; P.rig.base = 'block'; P.rig.setPose('block'); P.blockUntil = T + 10; P.blockHit = false; setTimeout(() => actionFx('block', P.rig, cf()), 90); }
-function blockContact() {
-  P.blockHit = true; camKick(-0.04, 3.2);
-  const s = B.vel.length(); const tz = P.tilt.y * (hasTrait('b1p2') ? -1 : 1), tx = P.tilt.x; const nd = netDir();   // Fake Block: forward / back tilt swapped
-  let vel, g = 1;
+function blockSolve(b, pos, nd, tz, tx, right) {   // a block touch on ball b by someone at pos facing the net along nd: W tilt (tz>0) = kill block, S tilt = soft one-touch back to our side
+  const s = b.vel.length(); let vel, g = 1;
   if (tz >= 0) {
     if (s >= 13) { const dir = withLateral(nd, tx, 30); const sp = s * 0.5; const ang = 52 * D; vel = new V3(dir.x * Math.cos(ang) * sp, -Math.sin(ang) * sp, dir.z * Math.cos(ang) * sp); g = 0.35; }
-    else { const tg = P.pos.clone().addScaledVector(withLateral(nd, tx, 30), 5.5); tg.y = 0; vel = launchTo(B.pos, tg, B.pos.y + 3.6); }
+    else { const tg = pos.clone().addScaledVector(withLateral(nd, tx, 30), 5.5); tg.y = 0; vel = launchTo(b.pos, tg, b.pos.y + 3.6); }
   } else {
     const f = clamp((s - 6) / 22, 0, 1); const dist = 1.5 + 6.5 * f;
-    const tg = P.pos.clone().addScaledVector(nd, -dist).addScaledVector(cr(), tx * 2); tg.y = 0;
-    vel = launchTo(B.pos, tg, B.pos.y + lerp(3.6, 1.1, f));
+    const tg = pos.clone().addScaledVector(nd, -dist).addScaledVector(right, tx * 2); tg.y = 0;
+    vel = launchTo(b.pos, tg, b.pos.y + lerp(3.6, 1.1, f));
   }
-  hitBall('block', vel, g);
+  return { vel, g };
+}
+function blockContact() {
+  P.blockHit = true; camKick(-0.04, 3.2);
+  const tz = P.tilt.y * (hasTrait('b1p2') ? -1 : 1), tx = P.tilt.x;   // Fake Block: forward / back tilt swapped
+  const r = blockSolve(B, P.pos, netDir(), tz, tx, cr());
+  hitBall('block', r.vel, r.g);
 }
 function chargeAt(dt) { return dt <= 0.1875 ? dt / 0.1875 * 0.5 : clamp(0.5 + (dt - 0.1875) / 0.375 * 0.5, 0, 1); }   // 0.19s to half, 0.56s to full
 function startSpike() {
@@ -3633,20 +3637,45 @@ function netAhead(from, fwd) {                 // distance to the nearest net in
 }
 // pitch (rad) that lands a shot of speed s under gravity gg at horizontal distance R with height change h (low trajectory); null if unreachable
 function ballisticPitch(s, gg, R, h) { const disc = s * s * s * s - gg * (gg * R * R + 2 * h * s * s); if (disc < 0) return null; return Math.atan((s * s - Math.sqrt(disc)) / (gg * R)); }
-function spikeGeom() {
-  const tz = P.tilt.y; const fwd = P.jumpFwd.clone().normalize();      // aim = facing at the moment you jumped; tilt never steers it
-  let toNet = netAhead(B.pos, fwd); if (!isFinite(toNet)) toNet = 7;
+function spikeGeomAt(pos, fwd, tz) {           // the geometry of a spike from `pos` aimed along `fwd` (shared by the player and the bots)
+  let toNet = netAhead(pos, fwd); if (!isFinite(toNet)) toNet = 7;
   const CL = S.scene === 'match' ? courtDims().l : COURT_L; const dMid = clamp(toNet + CL / 4, 3, 24);
-  const clearPitch = toNet < 1.2 ? -Math.PI / 2 : Math.min(35 * D, Math.atan2((NET_H + 0.35) - B.pos.y, toNet));   // capped; right at the net TOO LOW handles it instead
-  const neutralPitch = Math.max(Math.atan2(-B.pos.y, dMid), clearPitch);
+  const clearPitch = toNet < 1.2 ? -Math.PI / 2 : Math.min(35 * D, Math.atan2((NET_H + 0.35) - pos.y, toNet));   // capped; right at the net TOO LOW handles it instead
+  const neutralPitch = Math.max(Math.atan2(-pos.y, dMid), clearPitch);
   const far = clamp((toNet - 3) / (8 * (S.scene === 'match' ? courtDims().l / COURT_L : 1)), 0, 1);   // 0 at the net, 1 from the back line
   return { tz, fwd, neutralPitch, clearPitch, toNet, far };
+}
+function spikeGeom() { return spikeGeomAt(B.pos, P.jumpFwd.clone().normalize(), P.tilt.y); }   // aim = facing at the moment you jumped; tilt never steers it
+function spikeSolve(pos, fwd, tz, c, mult = 1) {   // the spike itself: velocity + gravity for a swing at charge c (0..1) with tilt tz - lob means it would have gone into the net (TOO LOW)
+  const { neutralPitch, clearPitch, toNet, far } = spikeGeomAt(pos, fwd, tz);
+  const sp = (13 + 22 * c) * (tz > 0 ? lerp(1, 0.75, tz) : 1) * mult;   // W tilt trades power for steepness
+  let pitch = tz >= 0 ? lerp(neutralPitch, -60 * D, tz) : lerp(neutralPitch, neutralPitch * 0.4, -tz);   // near the net: as before
+  if (tz < 0.35) pitch = Math.max(pitch, clearPitch);
+  let g = 0.18;
+  if (far > 0) {                                                        // far from the net: aim higher with more gravity so every tilt can still land in
+    const gFar = lerp(0.18, 2.6, far); const gg = BALL_G * gFar;      // heavier and heavier the further back you are
+    const CL2 = S.scene === 'match' ? courtDims().l : COURT_L; const R = tz >= 0 ? lerp(toNet + CL2 / 4, toNet + 1.5, tz) : lerp(toNet + CL2 / 4, toNet + CL2 / 2 - 0.8, -tz);
+    let pf = ballisticPitch(sp, gg, R, -pos.y); if (pf === null) pf = 40 * D;
+    for (let i = 0; i < 6; i++) {                                       // make sure it clears the net on the way
+      const t = toNet / (sp * Math.cos(pf)); const y = pos.y + sp * Math.sin(pf) * t - 0.5 * gg * t * t;
+      if (y >= NET_H + 0.4) break; pf += 4 * D;
+    }
+    pitch = lerp(pitch, pf, Math.min(1, far / 0.3)); g = gFar;
+  }
+  // TOO LOW: decided once, right here at the swing - if this spike would go into the net it becomes a high, airy ball over instead
+  if (isFinite(toNet) && toNet < 40) {
+    const tN = toNet / Math.max(0.5, sp * Math.cos(pitch)); const yN = pos.y + sp * Math.sin(pitch) * tN - 0.5 * BALL_G * g * tN * tN;
+    if (yN < NET_H + BALL_R) {
+      const tg = pos.clone().addScaledVector(fwd, toNet + 4.5); tg.y = 0;
+      return { vel: launchTo(pos, tg, Math.max(pos.y + 4.5, NET_H + 3.5)), g: 1, lob: true };
+    }
+  }
+  return { vel: new V3(fwd.x * Math.cos(pitch) * sp, Math.sin(pitch) * sp, fwd.z * Math.cos(pitch) * sp), g, lob: false };
 }
 function doSpike(c) {
   if (!ballReach(highPos(), REACH_A, 0.6)) return false;                  // spike hitbox: 60% as tall
   camKick(0.05 + c * 0.06, 2.6 + c * 4.5);                                // the harder the swing, the harder the camera takes it
-  const { tz, fwd, neutralPitch, clearPitch } = spikeGeom();
-  const sp = (13 + 22 * c) * (tz > 0 ? lerp(1, 0.75, tz) : 1) * (P.doubleSpike ? 1.2 : 1);   // W tilt trades power for steepness; Double Spike hits 20% harder
+  const { tz, fwd } = spikeGeom();
   if (B.serve) {                                                // serve: slightly up, full gravity, tilt ignored (full charge ~ back line)
     const ss = (13 + 22 * c) * (P.doubleSpike ? 1.2 : 1) * (hasTrait('b3p1') ? 1.1 : 1);   // serve speed IS your spike power, uncapped (35 m/s at full charge); every spike modifier carries over; King Serve +10%
     let gs = lerp(1, 2.0, c), pitch = lerp(20, 5, c) * D;                   // the harder the serve, the heavier it falls
@@ -3661,30 +3690,8 @@ function doSpike(c) {
     hitBall('spike', new V3(fwd.x * Math.cos(pitch) * ss, Math.sin(pitch) * ss, fwd.z * Math.cos(pitch) * ss), gs, c);
     return true;
   }
-  const { toNet, far } = spikeGeom();
-  let pitch = tz >= 0 ? lerp(neutralPitch, -60 * D, tz) : lerp(neutralPitch, neutralPitch * 0.4, -tz);   // near the net: as before
-  if (tz < 0.35) pitch = Math.max(pitch, clearPitch);
-  let g = 0.18;
-  if (far > 0) {                                                        // far from the net: aim higher with more gravity so every tilt can still land in
-    const gFar = lerp(0.18, 2.6, far); const gg = BALL_G * gFar;      // heavier and heavier the further back you are
-    const CL2 = S.scene === 'match' ? courtDims().l : COURT_L; const R = tz >= 0 ? lerp(toNet + CL2 / 4, toNet + 1.5, tz) : lerp(toNet + CL2 / 4, toNet + CL2 / 2 - 0.8, -tz);
-    let pf = ballisticPitch(sp, gg, R, -B.pos.y); if (pf === null) pf = 40 * D;
-    for (let i = 0; i < 6; i++) {                                       // make sure it clears the net on the way
-      const t = toNet / (sp * Math.cos(pf)); const y = B.pos.y + sp * Math.sin(pf) * t - 0.5 * gg * t * t;
-      if (y >= NET_H + 0.4) break; pf += 4 * D;
-    }
-    pitch = lerp(pitch, pf, Math.min(1, far / 0.3)); g = gFar;
-  }
-  // TOO LOW: decided once, right here at the swing - if this spike would go into the net it becomes a high, airy ball over instead
-  if (isFinite(toNet) && toNet < 40) {
-    const tN = toNet / Math.max(0.5, sp * Math.cos(pitch)); const yN = B.pos.y + sp * Math.sin(pitch) * tN - 0.5 * BALL_G * g * tN * tN;
-    if (yN < NET_H + BALL_R) {
-      const tg = B.pos.clone().addScaledVector(fwd, toNet + 4.5); tg.y = 0;
-      hitBall('spike', launchTo(B.pos, tg, Math.max(B.pos.y + 4.5, NET_H + 3.5)), 1, c);
-      showBallMsg('TOO LOW', B.pos); return true;
-    }
-  }
-  hitBall('spike', new V3(fwd.x * Math.cos(pitch) * sp, Math.sin(pitch) * sp, fwd.z * Math.cos(pitch) * sp), g, c); return true;
+  const r = spikeSolve(B.pos, fwd, tz, c, P.doubleSpike ? 1.2 : 1);   // Double Spike hits 20% harder
+  hitBall('spike', r.vel, r.g, c); if (r.lob) showBallMsg('TOO LOW', B.pos); return true;
 }
 function doTip() {
   if (!ballReach(highPos(), REACH_A, 0.6)) return false;
@@ -5030,7 +5037,7 @@ function botTeamOf(id) { const b = BOTS.find(x => x.id === id); return b ? b.tea
 function makeBot(id, name, model, team, idx, n) {
   const rig = new Rig(TEAM_VARIANT[team], model); scene.add(rig.root);
   const tag = document.createElement('div'); tag.className = 'tag'; tag.textContent = name; $('#tags').appendChild(tag);
-  const bot = { id, name, model, team, idx, n, rig, tag, pos: spawnPos(team, idx, n), vel: new V3(), onGround: true, ry: team === 'A' ? 0 : Math.PI, target: null, face: null, role: 'player', plan: null, jumpAt: 0, blockUntil: 0, lastHitT: -9, serveAt: 0, coin: 0, base: null };
+  const bot = { id, name, model, team, idx, n, rig, tag, pos: spawnPos(team, idx, n), vel: new V3(), onGround: true, ry: team === 'A' ? 0 : Math.PI, target: null, face: null, role: 'player', plan: null, jumpAt: 0, blockUntil: 0, blockTilt: -1, spike: null, lastHitT: -9, serveAt: 0, coin: 0, base: null };
   bot.base = bot.pos.clone(); rig.root.position.copy(bot.pos); rig.root.rotation.y = bot.ry; rig.setPose('idle'); rig.snap();
   remotes.set(id, { rig, tag, name, buf: [], data: { team, name }, speed: 0, stamp: null, gap: 0.09, jit: 0, delay: 0.18, lastArrive: 0, ptx: null, pty: 0, ptz: 0 });   // empty buffer: updateRemotes leaves it to us, projectTags draws the tag
   return bot;
@@ -5114,17 +5121,22 @@ function spikeTarget(kind, team, from) {
     default: return new V3(from.x * 0.4, 0, ez * 2.0);                                                    // tip
   }
 }
+function botPickSpike(bot, from) {               // decided the moment the hitter leaves the ground: one of six hits, aimed from where the ball will be, and it stays that way in the air
+  const kinds = ['leftCorner', 'rightCorner', 'middleLong', 'cut', 'straight', 'tip']; const kind = kinds[Math.floor(Math.random() * kinds.length)];
+  const tg = spikeTarget(kind, bot.team, from);
+  const fwd = new V3(tg.x - from.x, 0, tg.z - from.z); if (fwd.lengthSq() < 1e-4) fwd.set(0, 0, -sideZ(bot.team)); fwd.normalize();
+  const tz = kind === 'cut' ? 0.55 : kind === 'straight' || kind === 'tip' ? 0 : -0.5;                // sharp cut = W tilt (steep), corners and the long ball = S tilt (deep), straight = neutral
+  bot.spike = { kind, tg, fwd, tz, c: 0.5 + Math.random() * 0.5 };                                     // 50-100% power
+  bot.face = tg.clone();
+}
 function botSpike(bot) {
-  const b = matchBall(); const kinds = ['leftCorner', 'rightCorner', 'middleLong', 'cut', 'straight', 'tip']; const kind = kinds[Math.floor(Math.random() * kinds.length)];
-  const tg = spikeTarget(kind, bot.team, bot.pos); bot.face = tg.clone();
-  const contactY = b.pos.y;
-  if (contactY < NET_H - 0.25) {                                                                           // too low: lob it over instead of into the tape
-    const over = new V3(tg.x, 0, -sideZ(bot.team) * 4.5); botHit(bot, 'spike', launchTo(b.pos, over, Math.max(b.pos.y + 4.0, NET_H + 3.0)), 1); showBallMsg('TOO LOW', b.pos); return;
+  const b = matchBall(); if (!bot.spike) botPickSpike(bot, b.pos);
+  const sp = bot.spike; bot.spike = null; bot.face = sp.tg.clone();
+  if (sp.kind === 'tip') {                                                                               // a tip: the same soft touch a player's tip is
+    const pitch = 32 * D, s = 7; botHit(bot, 'tip', new V3(sp.fwd.x * Math.cos(pitch) * s, Math.sin(pitch) * s, sp.fwd.z * Math.cos(pitch) * s), 1); return;
   }
-  if (kind === 'tip') { botHit(bot, 'tip', launchTo(b.pos, tg, Math.max(b.pos.y + 0.4, NET_H + 0.5)), 1); return; }
-  const power = 0.5 + Math.random() * 0.5;                                                                // 50-100%
-  const gm = 1.4 + 2.2 * power; const apex = Math.max(b.pos.y + 0.25, NET_H + 0.55);
-  botHit(bot, 'spike', launchTo(b.pos, tg, apex, BALL_G * gm), gm);
+  const r = spikeSolve(b.pos, sp.fwd, sp.tz, sp.c);                                                     // exactly the player's spike: same speed, pitch, gravity and TOO LOW rule
+  botHit(bot, 'spike', r.vel, r.g); if (r.lob) showBallMsg('TOO LOW', b.pos);
 }
 /* ---- serving ---- */
 function botsOnServe() {                        // a serve state just began: everyone to base, the serving bot behind its line
@@ -5165,7 +5177,7 @@ function planTeam(team, bots) {
       }
       if (botReach(recv, false) && botMayTouch(recv) && (b.vel.y < 1 || b.pos.y < 1.6)) {              // touch 1: up to the setter spot
         const tg = setterSpot(team); recv.face = tg.clone();
-        botHit(recv, b.pos.y < 1.0 ? 'bump' : 'set', launchTo(b.pos, tg, Math.max(6.0, b.pos.y + 3.0)), 1);
+        botHit(recv, b.pos.y < 1.0 ? 'bump' : 'set', launchTo(b.pos, tg, Math.max(7.5, b.pos.y + 3.75)), 1);   // a high pass so the setter can jump-set it
         recv.plan = 'toAntenna'; recv.target = (recv.pos.x < 0 ? spots.left : spots.right).clone();
       }
     } else if (oursTouches === 1) {                                                                     // SET: the setter goes under the ball and puts it on a hitter
@@ -5191,11 +5203,12 @@ function planTeam(team, bots) {
         if (bot.id === b.hitter && bots.length <= 2) { bot.target = (bot.pos.x < 0 ? spots.left : spots.right).clone(); bot.plan = 'hitter'; continue; }
         if (k < 3 && (size <= 3 || k < 3)) { bot.target = spots[order[k++]].clone(); bot.plan = 'hitter'; } else { bot.target = bot.base.clone(); bot.plan = 'wait'; }
       }
-      const at = predictBall(b, { height: 2.1 }).atH; const under = at ? new V3(at.x, 0, at.z) : new V3(pred.land.x, 0, pred.land.z);
-      st.target = under.clone().addScaledVector(new V3(0, 0, sz), 0.25); st.face = new V3(b.pos.x, 0, b.pos.z);
-      const wantJump = at && at.y > 2.2 && dist2(st, under) < 0.8 && b.vel.y < 0 && b.pos.y < 3.4 && b.pos.y > 2.4;
+      const hi = predictBall(b, { height: 3.3 }).atH;                                                   // where the ball comes down through jump-set height
+      const at = hi || predictBall(b, { height: 2.1 }).atH; const under = at ? new V3(at.x, 0, at.z) : new V3(pred.land.x, 0, pred.land.z);
+      if (st.onGround) { st.target = under.clone().addScaledVector(new V3(0, 0, sz), 0.25); st.face = new V3(b.pos.x, 0, b.pos.z); }
+      const wantJump = hi && dist2(st, under) < 0.7 && hi.t < 0.5 && b.pos.y > 3.0;                     // in position and the ball is half a second from the hands: go up
       if (wantJump && st.onGround) botJump(st);
-      if (botMayTouch(st) && (botReach(st, !st.onGround) )) {
+      if (botMayTouch(st) && botReach(st, !st.onGround) && (!hi || !st.onGround || (b.vel.y < 0 && b.pos.y < 2.6))) {   // in the air: set at the top; on the ground only if it never got high enough
         let tg; if (pick === 'human') { const l = P.pos.distanceTo(spots.left), r = P.pos.distanceTo(spots.right); tg = (l < r ? spots.left : spots.right).clone(); }
         else { const hb = bots.find(x => x.id === pick); tg = hb ? hb.target.clone() : spots.left.clone(); }
         tg.addScaledVector(new V3(0, 0, sz), 0.4); st.face = tg.clone();
@@ -5211,9 +5224,10 @@ function planTeam(team, bots) {
       if (!hitter && human) hitter = null;                                                              // the human's ball
       for (const bot of bots) { if (bot !== hitter) { bot.target = bot === setter ? setterSpot(team) : bot.base.clone(); bot.plan = 'wait'; } }
       if (hitter) {
-        hitter.plan = 'attack'; hitter.target = aim.clone().addScaledVector(new V3(0, 0, sz), 0.45); hitter.face = new V3(b.pos.x, 0, b.pos.z);
+        hitter.plan = 'attack'; hitter.target = aim.clone().addScaledVector(new V3(0, 0, sz), 0.45);
+        if (hitter.onGround) { hitter.face = new V3(b.pos.x, 0, b.pos.z); hitter.spike = null; }      // on the ground it watches the ball; once it is up the hit is locked in
         const tLeft = spikeAt ? spikeAt.t : pred.land.t;
-        if (hitter.onGround && spikeAt && tLeft < 0.62 && dist2(hitter, aim) < 1.2) botJump(hitter);
+        if (hitter.onGround && spikeAt && tLeft < 0.62 && dist2(hitter, aim) < 1.2) { botPickSpike(hitter, new V3(spikeAt.x, spikeAt.y, spikeAt.z)); botJump(hitter); }
         if (!hitter.onGround && botReach(hitter, true) && botMayTouch(hitter) && b.vel.y < 2) botSpike(hitter);
         else if (hitter.onGround && !spikeAt && botReach(hitter, false) && botMayTouch(hitter) && b.pos.y < 1.7) {   // set never got up: shovel it over
           const over = new V3(0, 0, -sz * 5); botHit(hitter, 'bump', launchTo(b.pos, over, Math.max(NET_H + 2, b.pos.y + 3)), 1);
@@ -5226,16 +5240,16 @@ function planTeam(team, bots) {
     let blocker = null;
     if (theirs >= 2 && b.pos.z * sz < 0) {                                                              // they have set: front the attacker
       // the attacker: the human on their side if it is not who just hit, else their nearest bot to the ball
-      let attackerPos = null;
-      if (!human && b.hitter !== SID) attackerPos = P.pos;
-      else { const theirBots = BOTS.filter(x => x.team !== team && x.id !== b.hitter); if (theirBots.length) attackerPos = theirBots.reduce((a, x) => x.pos.distanceTo(b.pos) < a.pos.distanceTo(b.pos) ? x : a, theirBots[0]).pos; }
-      const netX = predictBall(b, { height: 2.9 }).atH; const fx = netX ? netX.x : (attackerPos ? attackerPos.x : b.pos.x);
-      const cands = bots.filter(x => !(human && x.coin < 0.5 && bots.length === 1));                      // a lone teammate flips a coin: block or dig
+      const netX = predictBall(b, { height: 2.9 }).atH; const aimP = netX ? new V3(netX.x, 0, netX.z) : new V3(pred.land.x, 0, pred.land.z);
+      const atk = []; if (!human && b.hitter !== SID) atk.push({ pos: P.pos, up: !P.onGround }); for (const x of BOTS) if (x.team !== team && x.id !== b.hitter) atk.push({ pos: x.pos, up: !x.onGround });
+      const attacker = atk.length ? atk.reduce((a, x) => x.pos.distanceTo(aimP) < a.pos.distanceTo(aimP) ? x : a, atk[0]) : null;   // whoever is closest to where the set comes down (never the one who just set it)
+      const attackerPos = attacker ? attacker.pos : null; const fx = netX ? netX.x : (attackerPos ? attackerPos.x : b.pos.x);
+      const cands = setter ? [setter] : bots.filter(x => !(human && x.coin < 0.5 && bots.length === 1));   // 3s+: only the setter ever goes up to block; 2s: a lone teammate flips a coin, block or dig
       if (cands.length) blocker = cands.reduce((a, x) => Math.abs(x.pos.x - fx) < Math.abs(a.pos.x - fx) ? x : a, cands[0]);
       if (blocker) {
         blocker.plan = 'block'; blocker.target = new V3(clamp(fx, -cd.w / 2 + 0.5, cd.w / 2 - 0.5), 0, sz * 0.9); blocker.face = new V3(fx, 0, -sz * 3);
-        const attackerUp = (attackerPos === P.pos) ? !P.onGround : BOTS.some(x => x.team !== team && !x.onGround);
-        if (attackerUp && blocker.onGround && Math.abs(blocker.pos.z) < 1.6) { botJump(blocker); blocker.blockUntil = T + 1.0; blocker.rig.base = 'block'; blocker.rig.setPose('block'); }
+        const attackerUp = !!attacker && attacker.up;                                                    // go up with the hitter (not with their setter's jump set)
+        if (attackerUp && blocker.onGround && Math.abs(blocker.pos.z) < 1.6) { blocker.blockTilt = (size <= 2 && Math.random() < 0.5) ? 1 : -1; botJump(blocker); blocker.blockUntil = T + 1.0; blocker.rig.base = 'block'; blocker.rig.setPose('block'); }   // 2s: kill block (W) or one-touch (S) 50/50; 3s+: bots only one-touch
       }
     }
     for (const bot of bots) {
@@ -5255,8 +5269,10 @@ function botBlockContacts() {                    // a ball coming over the tape 
     const sz = sideZ(bot.team);
     if (bot.onGround || T >= bot.blockUntil || b.hitter === bot.id || b.vel.z * sz <= 0 || b.pos.z * sz > 0.6 || b.pos.z * sz < -0.9) continue;
     const hands = bot.pos.clone().add(new V3(0, 2.35, 0)); if (b.pos.distanceTo(hands) > 1.15 || b.pos.y < NET_H - 0.3) continue;
-    const tg = new V3(bot.pos.x + (Math.random() - 0.5) * 3, 0, -sz * (2 + Math.random() * 3)); bot.face = tg.clone();
-    botHit(bot, 'block', launchTo(b.pos, tg, b.pos.y + 0.6, BALL_G * 1.6), 1.6); bot.blockUntil = 0;
+    const nd = new V3(0, 0, -sz); const tx = (Math.random() - 0.5) * 0.6;                              // straight at their court, a touch of lateral
+    const r = blockSolve(b, bot.pos, nd, bot.blockTilt || -1, tx, new V3(-1, 0, 0).multiplyScalar(sz));
+    bot.face = bot.pos.clone().addScaledVector(nd, 3);
+    botHit(bot, 'block', r.vel, r.g); bot.blockUntil = 0;
   }
 }
 function updateBots(dt) {
