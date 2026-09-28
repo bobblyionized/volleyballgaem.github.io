@@ -4,143 +4,246 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Volleyball Gaem</title>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@600;800;900&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:ital,wght@0,600;0,800;0,900;1,800;1,900&display=swap" rel="stylesheet">
 <style>
-:root{--bg:rgba(18,18,22,.92);--bg2:rgba(255,255,255,.08);--line:rgba(255,255,255,.18);--green:#3ecf5a;--red:#e5484d;--yellow:#f5c542;--blue:#3b8ff0;--text:#fff}
+:root{--bg:rgba(16,22,44,.92);--bg2:rgba(255,255,255,.07);--line:rgba(255,255,255,.16);--green:#3ecf7a;--red:#ff4d5e;--yellow:#ffd23f;--blue:#35a7ff;--orange:#ff8a1f;--navy:#0e1530;--navy2:#18224a;--text:#fff}
 *{box-sizing:border-box;user-select:none;-webkit-user-select:none}
-html,body{margin:0;height:100%;overflow:hidden;background:#87c7ee;font-family:Montserrat,"Segoe UI",Arial,sans-serif;color:var(--text)}
-canvas#c{position:fixed;inset:0;display:block;outline:none;filter:saturate(1.22) contrast(1.04)}
+html,body{margin:0;height:100%;overflow:hidden;background:#9fd8f5;font-family:Montserrat,"Segoe UI",Arial,sans-serif;color:var(--text)}
+canvas#c{position:fixed;inset:0;display:block;outline:none;touch-action:none}
+canvas#c.impact{filter:grayscale(1) brightness(1.08) contrast(8)}
 #ui{position:fixed;inset:0;pointer-events:none;overflow:hidden}
 #ui>*{pointer-events:auto}
 .hidden{display:none!important}
-button{font-family:inherit;font-weight:800;cursor:pointer;border:none;border-radius:6px;color:#fff;background:#3a3a44;padding:9px 14px;font-size:14px}
-button:hover{filter:brightness(1.15)}
+button{font-family:inherit;font-weight:800;cursor:pointer;border:none;border-radius:8px;color:#fff;background:#2a3566;padding:9px 14px;font-size:14px}
+button:hover{filter:brightness(1.12)}
 button:active{transform:translateY(1px)}
 button:disabled{opacity:.4;cursor:not-allowed;filter:none}
-input{font-family:inherit;font-weight:600;font-size:15px;padding:9px 11px;border-radius:6px;border:2px solid var(--line);background:rgba(0,0,0,.35);color:#fff;outline:none;width:100%;user-select:text;-webkit-user-select:text}
-input:focus{border-color:#fff}
-.btn.green{background:var(--green);color:#0c2412}.btn.red{background:var(--red)}.btn.blue{background:var(--blue)}.btn.grey{background:var(--bg2)}
+input,select{font-family:inherit;font-weight:700;font-size:15px;padding:9px 11px;border-radius:8px;border:2px solid var(--line);background:rgba(0,0,0,.3);color:#fff;outline:none;width:100%;user-select:text;-webkit-user-select:text}
+select{padding:8px}
+select option{background:#16204a}
+input:focus,select:focus{border-color:var(--yellow)}
+.btn.green{background:var(--green);color:#06301a}.btn.red{background:var(--red)}.btn.blue{background:var(--blue)}.btn.grey{background:var(--bg2)}.btn.orange{background:var(--orange)}
 .btn.small{padding:6px 10px;font-size:12px}
+.row{display:flex;gap:8px;align-items:center}
+.row.between{justify-content:space-between}
 
-/* touch controls (phones / tablets): joystick on the left, drag-to-look on the right, movable buttons */
+/* ---------- HUD ---------- */
+#menuChip{position:absolute;top:12px;right:12px;display:flex;align-items:center;gap:8px;background:rgba(14,21,48,.78);border:2px solid rgba(255,255,255,.2);padding:6px 12px 6px 6px;border-radius:10px;font-weight:900;font-style:italic;font-size:13px;letter-spacing:.5px}
+#menuChip b{background:var(--yellow);color:#1a1400;border-radius:6px;padding:3px 8px;font-style:normal}
+#toasts{position:absolute;top:64px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none;z-index:60}
+.toast{background:var(--bg);border:2px solid var(--line);padding:8px 14px;border-radius:10px;font-weight:800;font-size:14px}
+.toast.err{border-color:var(--red)}.toast.ok{border-color:var(--green)}
+#chat{position:absolute;top:12px;left:12px;width:330px;display:flex;flex-direction:column;gap:4px}
+#chat .ctabs{display:flex;gap:4px}
+#chat .ctabs button{padding:4px 10px;font-size:11px;background:rgba(14,21,48,.7);color:#cfd6ee}
+#chat .ctabs button.on{background:#fff;color:#111}
+#chatLog{max-height:150px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;font-size:12px;font-weight:700;padding:2px 0}
+#chatLog div{background:rgba(14,21,48,.55);padding:3px 8px;color:#eef;border-radius:6px;word-break:break-word}
+#chatLog .party b{color:#5dffa0}
+#chatLog .sys{color:var(--yellow);font-style:italic}
+#chatInput{font-size:12px;padding:6px 8px;background:rgba(14,21,48,.7)}
+#inviteBox{position:absolute;top:110px;left:50%;transform:translateX(-50%);background:var(--bg);border:2px solid var(--green);border-radius:10px;padding:10px 14px;font-weight:800;font-size:13px;display:flex;gap:10px;align-items:center;z-index:30}
+#queueStatus{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:var(--bg);border:2px solid var(--green);border-radius:10px;padding:7px 12px;font-weight:900;font-style:italic;display:flex;gap:12px;align-items:center;font-size:13px}
+#wind{position:absolute;right:14px;bottom:14px;background:rgba(14,21,48,.75);border-radius:10px;padding:6px 10px;font-size:11px;font-weight:900;display:flex;align-items:center;gap:8px;color:#dfe6ff}
+#wind i{display:inline-block;font-style:normal;font-size:16px;transition:transform .3s}
+/* action cards */
+#actions{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:10px}
+#utilCards{position:absolute;bottom:14px;left:14px;display:flex;gap:10px}
+.card{width:84px;height:94px;border-radius:12px;background:rgba(14,21,48,.82);border:2px solid rgba(255,255,255,.14);position:relative;overflow:hidden;box-shadow:inset 0 -24px 26px -18px rgba(255,138,31,.7)}
+.card img{position:absolute;left:50%;top:6px;width:58px;height:58px;transform:translateX(-50%)}
+.card .key{position:absolute;top:6px;left:6px;min-width:24px;height:22px;padding:0 5px;border-radius:6px;background:#fff;color:#111;font-size:11px;font-weight:900;display:flex;align-items:center;justify-content:center}
+.card .cdov{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.6);pointer-events:none}
+.card .cdt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:900}
+.card .lbl{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:13px;font-weight:900;font-style:italic;letter-spacing:.3px;text-shadow:0 2px 0 rgba(0,0,0,.5)}
+.card.hold .lbl:after{content:" (HOLD)";font-size:8px;opacity:.8}
+/* match hud */
+#matchHud{position:absolute;inset:0;pointer-events:none}
+#matchHud>*{pointer-events:auto}
+#score{position:absolute;top:10px;left:50%;transform:translateX(-50%) skewX(-10deg);display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,#151a2e,#1f2850);border-radius:10px;padding:6px 20px;font-size:28px;font-weight:900;border:2px solid rgba(255,255,255,.2)}
+#score>*{transform:skewX(10deg)}
+#score small{font-size:10px;opacity:.7;display:block;text-align:center;font-weight:900;letter-spacing:.5px}
+#modeTxt{font-size:11px;opacity:.75;font-style:italic}
+#touches{position:absolute;top:70px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+#touches i{width:12px;height:12px;border-radius:3px;background:rgba(0,0,0,.35);border:2px solid #fff}
+#touches i.on{background:var(--yellow)}
+#bigMsg{position:absolute;top:24%;left:50%;transform:translateX(-50%) skewX(-8deg);font-size:46px;font-weight:900;font-style:italic;text-shadow:0 4px 0 rgba(0,0,0,.35),0 0 18px rgba(0,0,0,.35);text-align:center;pointer-events:none;letter-spacing:1px;white-space:nowrap}
+#leaveBtn{position:absolute;bottom:14px;right:14px}
+#serveHint{position:absolute;bottom:120px;left:50%;transform:translateX(-50%);background:var(--yellow);color:#231a00;padding:7px 14px;border-radius:10px;font-weight:900;font-size:13px;white-space:nowrap}
+#impactFlash{position:absolute;inset:0;background:#fff;pointer-events:none;z-index:41;opacity:0;transition:opacity .22s ease-out}
+/* loading */
+#loading{position:absolute;inset:0;background:linear-gradient(180deg,#7cc7f0,#bfe8f7 60%,#f3e2b3 60%,#ecd49a);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:44px;font-weight:900;font-style:italic;z-index:90;color:#fff;text-shadow:0 4px 0 rgba(20,40,90,.3)}
+#loading small{font-size:13px;font-weight:800;font-style:normal;opacity:.9;margin-top:8px;color:#1b2b55;text-shadow:none}
+#loadBar{width:320px;max-width:80vw;height:14px;border:3px solid #fff;border-radius:10px;background:rgba(20,40,90,.25);margin-top:14px;overflow:hidden}
+#loadBar i{display:block;height:100%;width:0;background:var(--orange);transition:width .25s}
+#loadPct{font-size:12px;font-weight:900;font-style:normal;margin-top:6px;color:#1b2b55;text-shadow:none}
+/* emote wheel */
+#emoteWheel{position:absolute;left:50%;top:50%;width:360px;height:360px;transform:translate(-50%,-50%);pointer-events:none;z-index:20}
+#emoteWheel .slot{position:absolute;width:92px;height:92px;margin:-46px 0 0 -46px;background:rgba(14,21,48,.9);border:2px solid var(--line);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;font-weight:900;text-transform:uppercase;text-align:center;color:#cfd6ee}
+#emoteWheel .slot.sel{background:var(--yellow);color:#111;border-color:#fff}
+#emoteWheel .slot small{font-size:9px;opacity:.6;font-weight:700}
+#emoteWheel .center{position:absolute;left:50%;top:50%;width:70px;height:70px;margin:-35px 0 0 -35px;background:rgba(14,21,48,.9);border:2px solid var(--line);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900}
+
+/* ---------- touch controls ---------- */
 #touchUi{position:absolute;inset:0;pointer-events:none}
 #touchUi .zone{position:absolute;top:0;bottom:0;pointer-events:auto;touch-action:none}
-#joyZone{left:0;width:45%}#lookZone{right:0;width:55%}
+#joyZone{left:0;width:45%}
 #joy{position:absolute;width:120px;height:120px;margin:-60px 0 0 -60px;pointer-events:none;display:none}
-#joyBase{position:absolute;inset:0;border-radius:50%;background:rgba(20,20,26,.45);border:2px solid rgba(255,255,255,.35)}
+#joyBase{position:absolute;inset:0;border-radius:50%;background:rgba(14,21,48,.4);border:2px solid rgba(255,255,255,.35)}
 #joyKnob{position:absolute;left:50%;top:50%;width:52px;height:52px;margin:-26px 0 0 -26px;border-radius:50%;background:rgba(255,255,255,.85);box-shadow:0 2px 6px rgba(0,0,0,.4)}
-.tbtn{position:absolute;width:64px;height:64px;border-radius:50%;background:rgba(20,20,26,.72);border:2px solid rgba(255,255,255,.4);color:#fff;font-weight:900;font-size:11px;line-height:1.05;display:flex;align-items:center;justify-content:center;text-align:center;pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none;text-shadow:0 1px 2px #000}
+.tbtn{position:absolute;width:64px;height:64px;border-radius:50%;background:rgba(14,21,48,.72);border:2px solid rgba(255,255,255,.4);color:#fff;font-weight:900;font-size:11px;line-height:1.05;display:flex;align-items:center;justify-content:center;text-align:center;pointer-events:auto;touch-action:none;user-select:none;-webkit-user-select:none;text-shadow:0 1px 2px #000}
 .tbtn.big{width:84px;height:84px;font-size:13px}
 .tbtn.on{background:var(--yellow);color:#111;text-shadow:none}
 .tbtn.dim{opacity:.45}
-.tbtn .cd{position:absolute;inset:0;border-radius:50%;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;font-size:18px}
-body.touch #actions,body.touch #utilCards,body.touch #lockHint,body.touch #crosshair{display:none!important}
-body.touch #chat{width:min(300px,55vw)}
-body.touch .card2,body.touch .panel{-webkit-user-select:none}
+body.touch #actions,body.touch #utilCards,body.touch #menuChip{display:none!important}
+body.touch #chat{width:min(290px,50vw)}
 #touchUi.edit .tbtn{outline:2px dashed var(--yellow);outline-offset:3px;opacity:1!important}
-#touchEdit{position:absolute;top:60px;left:50%;transform:translateX(-50%);background:var(--bg);border:2px solid var(--yellow);border-radius:8px;padding:8px 12px;font-weight:800;font-size:13px;display:flex;gap:10px;align-items:center;pointer-events:auto}
-/* top bar */
-#topbar{position:absolute;top:12px;right:12px;display:grid;grid-template-columns:auto auto;gap:8px;align-items:center;justify-items:end}
-#invBtn{grid-column:2;background:#222}
-#userBtn{background:var(--blue)}
-#menuBtn{background:#222}
-#online{position:absolute;top:12px;left:12px;font-size:12px;font-weight:800;padding:7px 11px;border-radius:6px;background:var(--bg);color:#cfd3dc;display:flex;gap:8px;align-items:center}
-#online b{color:#fff}
-#online .dot{width:8px;height:8px;border-radius:50%;background:#777}
-#online .dot.on{background:var(--green)}
-#ballMsg{position:absolute;transform:translate(-50%,-100%);background:#e5484d;color:#fff;font-weight:900;font-size:13px;padding:4px 8px;pointer-events:none;white-space:nowrap}
-#impactTint{position:absolute;inset:0;background:#2040ff;mix-blend-mode:multiply;pointer-events:none;z-index:40}
-#impactFlash{position:absolute;inset:0;background:#fff;pointer-events:none;z-index:41;opacity:0;transition:opacity .22s ease-out}
-canvas#c.impact{filter:grayscale(1) brightness(1.05) contrast(60)}   /* hard black & white threshold */
-#chat{position:absolute;top:82px;left:12px;width:340px;display:flex;flex-direction:column;gap:4px;pointer-events:auto}
-#chat .ctabs{display:flex;gap:4px}
-#chat .ctabs button{padding:4px 10px;font-size:11px;background:rgba(18,18,22,.75);color:#cfd3dc}
-#chat .ctabs button.on{background:#fff;color:#111}
-#chatLog{max-height:170px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;font-size:12px;font-weight:600;padding:4px 0}
-#chatLog div{background:rgba(18,18,22,.62);padding:3px 8px;color:#e8e8ee;word-break:break-word}
-#chatLog b{color:#fff}
-#chatLog .party b{color:#3ecf5a}
-#chatLog .sys{color:#f5c542;font-style:italic}
-#chatInput{font-size:12px;padding:6px 8px;background:rgba(18,18,22,.8);border:2px solid var(--line)}
-#chatInput:focus{border-color:#fff}
-#inviteBox{position:absolute;top:120px;left:50%;transform:translateX(-50%);background:var(--bg);border:2px solid var(--green);padding:10px 14px;font-weight:800;font-size:13px;display:flex;gap:10px;align-items:center}
-.tag.party{color:#3ecf5a}
-#partyPanel .mem{display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.3);padding:7px 10px;margin-bottom:6px;font-weight:700}
-#partyPanel .mem .lead{font-size:10px;background:var(--yellow);color:#221;padding:2px 6px}
-#emoteWheel{position:absolute;left:50%;top:50%;width:360px;height:360px;transform:translate(-50%,-50%);pointer-events:none}
-#emoteWheel .slot{position:absolute;width:92px;height:92px;margin:-46px 0 0 -46px;background:rgba(18,18,22,.9);border:2px solid var(--line);display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;font-weight:900;text-transform:uppercase;text-align:center;color:#cfd3dc}
-#emoteWheel .slot.sel{background:#fff;color:#111;border-color:#fff}
-#emoteWheel .slot small{font-size:9px;opacity:.6;font-weight:700}
-#emoteWheel .center{position:absolute;left:50%;top:50%;width:70px;height:70px;margin:-35px 0 0 -35px;background:rgba(18,18,22,.9);border:2px solid var(--line);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900;text-align:center}
-#wind{position:absolute;right:14px;bottom:14px;background:var(--bg);border:2px solid var(--line);padding:6px 10px;font-size:11px;font-weight:800;display:flex;align-items:center;gap:8px;color:#cfd3dc}
-#wind i{display:inline-block;width:0;height:0;border-left:7px solid transparent;border-right:7px solid transparent;border-bottom:16px solid #fff;transform-origin:50% 60%}
-#npcPrompt{position:absolute;transform:translate(-50%,-100%);background:var(--bg);border:2px solid var(--line);padding:6px 10px;font-weight:800;font-size:13px;pointer-events:none;white-space:nowrap}
-#npcPrompt b{background:#fff;color:#111;padding:1px 6px;margin-right:6px}
-.shopish .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.shopish .item .rar{font-size:10px;font-weight:900;letter-spacing:.6px;text-transform:uppercase}
-.shopish .item{border:2px solid transparent}
-/* inventory */
-#invPanel{width:840px;padding:0;overflow:hidden;display:flex;flex-direction:column;max-height:88vh}
-#invPanel h2{padding:14px 18px 0}
-#invBody{display:flex;min-height:0;flex:1}
-#invNav{width:150px;flex:none;display:flex;flex-direction:column;gap:6px;padding:0 12px 14px 16px}
-#invNav button{text-align:left;background:var(--bg2);color:#cfd3dc;padding:11px 12px;font-size:13px;text-transform:uppercase;letter-spacing:.4px}
-#invNav button.on{background:#fff;color:#111}
-#invMain{flex:1;min-width:0;display:flex;gap:12px;padding:0 16px 16px 4px;min-height:0}
-#invGrid{flex:1;display:grid;grid-template-columns:repeat(auto-fill,88px);gap:12px 10px;align-content:start;overflow:auto;max-height:66vh;padding:12px 4px 4px}
-.tile{width:88px;height:88px;border-radius:8px;border:3px solid #9aa0a6;background:rgba(0,0,0,.35);position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center}
+#touchEdit{position:absolute;top:60px;left:50%;transform:translateX(-50%);background:var(--bg);border:2px solid var(--yellow);border-radius:10px;padding:8px 12px;font-weight:800;font-size:13px;display:flex;gap:10px;align-items:center;pointer-events:auto}
+
+/* ---------- the M menu (Spike Cross style): a slanted panel on the left, the live lobby stays visible on the right ---------- */
+#menu{position:absolute;inset:0;display:flex;flex-direction:column;z-index:40;pointer-events:none}
+#menu>*{pointer-events:auto}
+#menu:before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,rgba(9,14,34,.96) 0%,rgba(12,18,44,.94) 58%,rgba(12,18,44,.55) 66%,rgba(12,18,44,0) 78%);pointer-events:none}
+.mTop{position:relative;display:flex;align-items:center;gap:14px;padding:14px 18px 10px;flex:none}
+.mProfile{display:flex;align-items:center;gap:12px;background:linear-gradient(90deg,var(--orange),#ff5f3a);padding:6px 18px 6px 6px;border-radius:12px;transform:skewX(-10deg);box-shadow:0 4px 0 rgba(0,0,0,.35)}
+.mProfile>*{transform:skewX(10deg)}
+#mAvatar{width:52px;height:52px;border-radius:10px;background:#ffe3c2}
+.mName{font-size:22px;font-weight:900;font-style:italic;line-height:1}
+.mSub{font-size:10px;font-weight:900;letter-spacing:.6px;opacity:.85;margin-top:3px}
+.mCur{display:flex;align-items:center;gap:8px;background:rgba(255,255,255,.08);padding:8px 14px;border-radius:12px;transform:skewX(-10deg);font-size:18px;font-weight:900}
+.mCur>*{transform:skewX(10deg)}
+.mCur .coin{width:24px;height:24px;border-radius:50%;background:var(--yellow);color:#4a3400;display:flex;align-items:center;justify-content:center;font-size:14px}
+.mOnline{font-size:12px;font-weight:900;color:#cfd6ee;display:flex;gap:6px;align-items:center}
+.mOnline .dot{width:9px;height:9px;border-radius:50%;background:#777}
+.mOnline .dot.on{background:var(--green)}
+#menuClose{margin-left:auto;margin-right:34%;background:rgba(255,255,255,.1);font-style:italic}
+#menuClose b{background:var(--yellow);color:#111;border-radius:5px;padding:1px 6px;margin-right:6px;font-style:normal}
+.mBody{position:relative;display:flex;gap:16px;flex:1;min-height:0;padding:4px 18px 18px;width:66%;min-width:min(760px,100%)}
+.mNav{display:flex;flex-direction:column;gap:8px;flex:none;width:176px}
+.mNav button{position:relative;text-align:left;font-size:17px;font-weight:900;font-style:italic;padding:14px 16px;background:rgba(255,255,255,.07);border-radius:10px;transform:skewX(-10deg);letter-spacing:.4px;color:#dfe6ff}
+.mNav button>span{display:inline-block;transform:skewX(10deg)}
+.mNav button.on{background:linear-gradient(90deg,var(--yellow),#ffb21f);color:#1c1300;box-shadow:0 4px 0 rgba(0,0,0,.35)}
+.mNav button .badge{position:absolute;right:10px;top:50%;transform:translateY(-50%) skewX(10deg)}
+.mSec{flex:1;min-width:0;overflow:auto;padding-right:6px}
+.mSec h2{margin:2px 0 12px;font-size:26px;font-weight:900;font-style:italic;letter-spacing:.5px;text-transform:uppercase;display:flex;align-items:center;gap:12px}
+.mSec h2 small{font-size:12px;font-weight:800;font-style:normal;opacity:.6;letter-spacing:0;text-transform:none}
+.mSec h3{margin:0 0 8px;font-size:12px;letter-spacing:.8px;text-transform:uppercase;color:var(--yellow);font-weight:900}
+.pane{background:rgba(255,255,255,.06);border-radius:12px;padding:12px 14px;margin-bottom:12px}
+.subtabs{display:flex;gap:6px;margin-bottom:12px;flex-wrap:wrap}
+.subtabs button{background:rgba(255,255,255,.08);color:#cfd6ee;font-style:italic;font-weight:900;transform:skewX(-10deg);padding:8px 14px}
+.subtabs button.on{background:#fff;color:#111}
+.badge{background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;font-style:normal}
+/* play */
+#modeCards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:12px}
+.mode{position:relative;height:118px;border-radius:14px;padding:12px;text-align:left;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;transform:skewX(-6deg);border:3px solid transparent;background:linear-gradient(160deg,#2a63b8,#10255a)}
+.mode>*{transform:skewX(6deg)}
+.mode .mt{font-size:28px;font-weight:900;font-style:italic;line-height:1}
+.mode .md{font-size:11px;font-weight:800;opacity:.85;margin-top:4px}
+.mode .mc{position:absolute;top:8px;right:10px;font-size:10px;font-weight:900;background:rgba(0,0,0,.3);padding:2px 7px;border-radius:6px}
+.mode.m2{background:linear-gradient(160deg,#ffb74a,#e8622a)}.mode.m3{background:linear-gradient(160deg,#39b8ff,#1f4fd1)}.mode.m6{background:linear-gradient(160deg,#b06bff,#5a2bbf)}.mode.mp{background:linear-gradient(160deg,#46d58b,#1d7f55)}
+.mode.on{border-color:#fff;box-shadow:0 0 0 3px var(--yellow),0 6px 0 rgba(0,0,0,.35)}
+.toggles{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:12px}
+.tgl{display:flex;gap:6px;align-items:center;font-weight:900;font-size:12px;letter-spacing:.5px}
+.tgl button{background:rgba(255,255,255,.08);font-style:italic;padding:7px 12px}
+.tgl button.on{background:#fff;color:#111}
+#teamList .mem{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.25);border-radius:10px;padding:8px 12px;margin-bottom:6px;font-size:15px;font-weight:900}
+#teamList .mem .av{width:30px;height:30px;border-radius:8px;background:#fff;color:#111;display:flex;align-items:center;justify-content:center}
+#teamList .mem .lead{font-size:10px;background:var(--yellow);color:#221;border-radius:5px;padding:2px 6px;margin-left:auto}
+#lockToggle{background:#000;border:2px solid var(--red);color:var(--red);padding:5px 12px}
+#lockToggle.on{border-color:var(--green);color:var(--green)}
+#queueBtn{padding:16px 48px;font-size:26px;font-weight:900;font-style:italic;background:linear-gradient(90deg,var(--yellow),var(--orange));color:#1c1300;border-radius:14px;transform:skewX(-10deg);box-shadow:0 6px 0 rgba(0,0,0,.35)}
+#queueBtn.cancel{background:var(--red);color:#fff}
+#playNote{font-size:12px;font-weight:700;opacity:.7;margin-top:8px}
+/* grids (inventory + shop) */
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(132px,1fr));gap:10px}
+.item{background:rgba(255,255,255,.06);border-radius:12px;padding:10px;text-align:center;border:2px solid transparent}
+.item img{width:88px;height:88px;display:block;margin:0 auto 6px;background:rgba(0,0,0,.2);border-radius:10px}
+.item .nm{font-weight:900;font-size:14px}
+.item .rar{font-size:10px;font-weight:900;letter-spacing:.6px;text-transform:uppercase}
+.item .pr{font-size:12px;color:var(--green);font-weight:900;margin:2px 0 8px}
+.item button{width:100%;padding:8px}
+.item.owned button{background:var(--blue)}
+.item.equipped button{background:var(--green);color:#06301a}
+#invBody{display:flex;gap:12px;min-height:0}
+#invMain{flex:1;min-width:0;display:flex;gap:12px}
+#invGrid{flex:1;display:grid;grid-template-columns:repeat(auto-fill,86px);gap:12px 10px;align-content:start;padding-top:10px}
+.tile{width:86px;height:86px;border-radius:12px;border:3px solid #9aa0a6;background:rgba(0,0,0,.28);position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .tile:hover{background:rgba(255,255,255,.12)}
-.tile img{width:72px;height:72px}
+.tile img{width:70px;height:70px}
 .tile.sel{outline:3px solid #fff;outline-offset:2px}
-.tile .eqp{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--green);color:#0c2412;font-size:9px;font-weight:900;padding:1px 6px;border-radius:4px;letter-spacing:.4px;white-space:nowrap}
-#invDetail{width:220px;flex:none;background:rgba(0,0,0,.3);border-radius:8px;padding:14px;text-align:center;display:flex;flex-direction:column;gap:8px;align-self:flex-start}
-#invDetail img{width:140px;height:140px;margin:0 auto;background:rgba(0,0,0,.25);border-radius:8px}
-#invDetail .nm{font-size:20px;font-weight:900;line-height:1.1}
+.tile .eqp{position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--green);color:#06301a;font-size:9px;font-weight:900;padding:1px 6px;border-radius:5px;white-space:nowrap}
+#invDetail{width:210px;flex:none;background:rgba(0,0,0,.25);border-radius:12px;padding:14px;text-align:center;display:flex;flex-direction:column;gap:8px;align-self:flex-start}
+#invDetail img{width:130px;height:130px;margin:0 auto;background:rgba(0,0,0,.2);border-radius:10px}
+#invDetail .nm{font-size:20px;font-weight:900;font-style:italic;line-height:1.1}
 #invDetail .rar{font-size:11px;font-weight:900;letter-spacing:.6px;text-transform:uppercase}
-#invDetail .desc{font-size:12px;opacity:.75;font-weight:600;font-style:italic;min-height:32px}
+#invDetail .desc{font-size:12px;opacity:.75;font-weight:700;font-style:italic;min-height:30px}
 #invDetail button{width:100%}
-#invDetail.none{opacity:.5;font-weight:700;font-size:13px;justify-content:center;min-height:200px}
-#invEmpty{opacity:.6;font-weight:700;padding:24px;text-align:center;width:100%}
-/* traits tab */
-#invTraits{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px;padding:0 16px 16px 4px;min-height:0}
+#invDetail.none{opacity:.5;font-weight:800;font-size:13px;justify-content:center;min-height:200px}
+#invEmpty{opacity:.6;font-weight:800;padding:24px;text-align:center;width:100%;grid-column:1/-1}
+#invTraits{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
 #loadout{display:flex;gap:14px;justify-content:center;flex:none}
-.tcard{border-radius:10px;border:3px solid;padding:10px;display:flex;flex-direction:column;justify-content:space-between;text-align:center;position:relative;cursor:pointer;color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.35)}
+#invBag{display:grid;grid-template-columns:repeat(auto-fill,120px);gap:14px 10px;padding-top:10px;align-content:start}
+#bagTitle{font-size:11px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;color:var(--yellow)}
+.tcard{border-radius:12px;border:3px solid;padding:10px;display:flex;flex-direction:column;justify-content:space-between;text-align:center;position:relative;cursor:pointer;color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.35)}
 .tcard.pas{border-color:#6fb4ff;background:linear-gradient(160deg,#2a63b8,#0d2a5c)}
 .tcard.abl{border-color:#ff7a7a;background:linear-gradient(160deg,#c42a31,#4a0d10)}
 .tcard .ty{font-size:10px;font-weight:900;letter-spacing:.8px;text-transform:uppercase;opacity:.85}
-.tcard .tn{font-size:15px;font-weight:900;line-height:1.1}
-.tcard .td{font-size:10px;opacity:.75;font-weight:600}
-.tcard .sym{width:56px;height:56px;border-radius:50%;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.35);margin:6px auto;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:900}
+.tcard .tn{font-size:15px;font-weight:900;font-style:italic;line-height:1.1}
+.tcard .td{font-size:10px;opacity:.78;font-weight:700}
+.tcard .sym{width:54px;height:54px;border-radius:50%;background:rgba(255,255,255,.18);border:2px solid rgba(255,255,255,.35);margin:6px auto;display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:900}
 .tcard.slot{width:150px;height:200px}
 .tcard.slot:hover{filter:brightness(1.15)}
 .tcard.slot.empty{border-style:dashed;opacity:.85;justify-content:center;cursor:default}
 .tcard.slot.empty .tn{font-size:22px;opacity:.7}
-.tcard.slot.empty .td{margin-top:6px}
 .tcard.mini{width:120px;height:170px}
 .tcard.mini .tn{font-size:13px}
 .tcard.mini .sym{width:44px;height:44px;font-size:17px;margin:4px auto}
 .tcard.mini .td{display:none}
 .tcard.mini button{padding:5px;font-size:11px;margin-top:4px;background:var(--blue)}
-.tcard.mini .odds{position:absolute;top:-10px;right:-8px;background:var(--yellow);color:#111;font-size:11px;font-weight:900;padding:2px 7px;border-radius:5px}
-#invBag{display:grid;grid-template-columns:repeat(auto-fill,120px);gap:14px 10px;overflow:auto;flex:1;min-height:120px;padding:12px 4px 4px;max-height:40vh;align-content:start}
-#bagTitle{font-size:11px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;color:var(--yellow)}
-.bag-box{width:120px;height:170px;border-radius:10px;border:3px solid #cd7f32;background:rgba(0,0,0,.35);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:8px;text-align:center;box-shadow:0 4px 0 rgba(0,0,0,.35)}
+.tcard.mini .odds{position:absolute;top:-10px;right:-8px;background:var(--yellow);color:#111;font-size:11px;font-weight:900;padding:2px 7px;border-radius:6px}
+.tcard.mini .del{position:absolute;top:-10px;left:-8px;width:22px;height:22px;padding:0;border-radius:6px;background:var(--red);font-size:11px;line-height:22px;margin:0}
+.bag-box{width:120px;height:170px;border-radius:12px;border:3px solid #cd7f32;background:rgba(0,0,0,.3);display:flex;flex-direction:column;align-items:center;justify-content:space-between;padding:8px;text-align:center;box-shadow:0 4px 0 rgba(0,0,0,.35)}
 .bag-box img{width:80px;height:80px}
 .bag-box .tn{font-size:12px;font-weight:900}
-.bag-box button{width:100%;padding:6px;font-size:11px;background:var(--green);color:#0c2412}
-.tier1{border-color:#cd7f32!important}.tier2{border-color:#d0d6dd!important}.tier3{border-color:#f5c542!important}.tier4{border-color:#e5484d!important}
-.vmark{position:absolute;width:14px;height:14px;transform:translate(-50%,-100%);border:2px solid #fff;border-radius:3px;box-shadow:0 0 6px rgba(0,0,0,.6);pointer-events:none}
-/* trait shop */
-#traitPeekCards{display:flex;gap:12px;justify-content:center;padding-top:8px}
-/* confirm dialog */
-#confirmBox{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:5}
-#confirmBox .dlg{width:360px;background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:18px 20px;text-align:center}
-#confirmBox h3{margin:0 0 8px;font-size:18px;font-weight:900;text-transform:uppercase}
-#confirmBox p{margin:0 0 14px;font-size:13px;font-weight:600;opacity:.8}
+.bag-box button{width:100%;padding:6px;font-size:11px;background:var(--green);color:#06301a}
+.tier1{border-color:#cd7f32!important}.tier2{border-color:#d0d6dd!important}.tier3{border-color:#f5c542!important}.tier4{border-color:#ff4d5e!important}
+#traitPeekCards{display:flex;gap:12px;justify-content:center;padding-top:10px;flex-wrap:wrap}
+.r-common{color:#b3bac2}.r-rare{color:#35a7ff}.r-epic{color:#b06bff}.r-legendary{color:#ffd23f}.r-mythic{color:#ff4d5e}
+.b-common{border-color:#9aa0a6!important}.b-rare{border-color:#35a7ff!important}.b-epic{border-color:#b06bff!important}.b-legendary{border-color:#ffd23f!important}.b-mythic{border-color:#ff4d5e!important}
+#shopDealer{display:flex;align-items:center;gap:12px;background:linear-gradient(90deg,rgba(255,138,31,.25),rgba(255,138,31,0));border-radius:12px;padding:8px 12px;margin-bottom:10px}
+#shopDealer canvas{width:56px;height:56px;border-radius:10px;background:rgba(0,0,0,.25)}
+#shopDealer b{font-size:18px;font-weight:900;font-style:italic;display:block}
+#shopDealer span{font-size:12px;font-weight:700;opacity:.8}
+/* quests */
+.quest{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.06);border-radius:12px;padding:12px 14px;margin-bottom:8px}
+.quest .qi{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;background:rgba(255,255,255,.1)}
+.quest .qt{font-weight:900;font-size:15px}
+.quest .qd{font-size:11px;font-weight:700;opacity:.7}
+.quest .qb{height:8px;border-radius:5px;background:rgba(0,0,0,.35);margin-top:6px;overflow:hidden}
+.quest .qb i{display:block;height:100%;background:linear-gradient(90deg,var(--yellow),var(--orange))}
+.quest .qr{margin-left:auto;text-align:right;font-weight:900;font-size:13px;color:var(--green);white-space:nowrap}
+.soon{font-size:11px;font-weight:900;background:var(--blue);padding:3px 8px;border-radius:6px;letter-spacing:.5px}
+/* social + settings */
+.flist{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto}
+.fr{display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.25);border-radius:10px;padding:7px 10px;font-weight:800}
+.fr .st{width:8px;height:8px;border-radius:50%;background:#666;display:inline-block;margin-right:8px}
+.fr .st.on{background:var(--green)}
+.cols{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
+.field label{font-size:11px;font-weight:900;color:#b9c3e6;letter-spacing:.6px;text-transform:uppercase}
+.money{font-size:22px;font-weight:900;color:var(--green)}
+.kb{display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.22);border-radius:10px;padding:7px 12px;margin-bottom:5px;font-size:14px;font-weight:800}
+.kb .key{min-width:64px;padding:4px 10px;border:2px solid #fff;border-radius:6px;background:#000;text-align:center;font-size:13px;cursor:pointer}
+.kb .key.listening{border-color:var(--yellow);color:var(--yellow)}
+.kbgrp{font-size:11px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;color:var(--yellow);margin:10px 0 6px}
+#partyMembers .mem{display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.25);border-radius:10px;padding:7px 10px;margin-bottom:6px;font-weight:800}
+#partyMembers .mem .lead{font-size:10px;background:var(--yellow);color:#221;padding:2px 6px;border-radius:5px}
+/* confirm + box opening */
+#confirmBox{position:absolute;inset:0;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;z-index:70}
+#confirmBox .dlg{width:360px;background:var(--navy2);border:2px solid var(--line);border-radius:14px;padding:18px 20px;text-align:center}
+#confirmBox h3{margin:0 0 8px;font-size:19px;font-weight:900;font-style:italic;text-transform:uppercase}
+#confirmBox p{margin:0 0 14px;font-size:13px;font-weight:700;opacity:.8}
 #confirmBox .row{justify-content:center}
-.tcard.mini .del{position:absolute;top:-10px;left:-8px;width:22px;height:22px;padding:0;border-radius:6px;background:var(--red);font-size:11px;line-height:22px}
-/* box opening */
-#openFx{position:absolute;inset:0;background:rgba(0,0,0,.74);display:flex;align-items:center;justify-content:center}
+#openFx{position:absolute;inset:0;background:rgba(6,10,26,.8);display:flex;align-items:center;justify-content:center;z-index:65}
 #openStage{position:relative;width:420px;height:540px}
 #openChest{width:240px;height:240px;position:absolute;left:90px;top:210px;pointer-events:none}
 #openChest.shake{animation:chestShake .95s ease-in-out}
@@ -153,129 +256,18 @@ canvas#c.impact{filter:grayscale(1) brightness(1.05) contrast(60)}   /* hard bla
 #openCard{width:170px;height:230px;position:absolute;left:125px;top:250px;opacity:0;transform:scale(.2);cursor:default;pointer-events:none}
 #openCard.fly{animation:cardFly 1.1s cubic-bezier(.2,.9,.3,1.15) forwards}
 @keyframes cardFly{0%{opacity:0;transform:translateY(40px) scale(.2) rotateY(0)}35%{opacity:1;transform:translateY(-110px) scale(.7) rotateY(180deg)}100%{opacity:1;transform:translateY(-255px) scale(1) rotateY(360deg)}}
-#openMsg{position:absolute;top:446px;width:100%;text-align:center;font-size:20px;font-weight:900;text-transform:uppercase;letter-spacing:.5px;opacity:0;transition:opacity .3s;pointer-events:none;line-height:1.1}
-#openMsg small{display:block;font-size:12px;opacity:.7;text-transform:none;letter-spacing:0}
+#openMsg{position:absolute;top:446px;width:100%;text-align:center;font-size:21px;font-weight:900;font-style:italic;text-transform:uppercase;opacity:0;transition:opacity .3s;pointer-events:none;line-height:1.1}
+#openMsg small{display:block;font-size:12px;opacity:.7;text-transform:none;font-style:normal}
 #openDone{position:absolute;top:500px;left:50%;transform:translateX(-50%);opacity:0;transition:opacity .3s;padding:12px 28px;font-size:16px;pointer-events:none}
 #openDone.ready{pointer-events:auto}
-.r-common{color:#9aa0a6}.r-rare{color:#3b8ff0}.r-epic{color:#a259ff}.r-legendary{color:#f5c542}.r-mythic{color:#e5484d}
-.b-common{border-color:#9aa0a6!important}.b-rare{border-color:#3b8ff0!important}.b-epic{border-color:#a259ff!important}.b-legendary{border-color:#f5c542!important}.b-mythic{border-color:#e5484d!important}
-.shopish .item{background:var(--bg2);padding:10px;text-align:center}
-.shopish .item img{width:96px;height:96px;display:block;margin:0 auto 6px;background:rgba(0,0,0,.25)}
-.shopish .item .nm{font-weight:900;font-size:14px}
-.shopish .item .pr{font-size:12px;color:var(--green);font-weight:800;margin:2px 0 8px}
-.shopish .item button{width:100%;padding:8px}
-.shopish .item.owned button{background:var(--blue)}
-.shopish .item.equipped button{background:var(--green);color:#0c2412}
-
-/* hud */
-#stateBox{position:absolute;bottom:14px;left:14px;display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:800}
-#stateBox .row{background:var(--bg);padding:6px 10px;border-radius:6px;display:flex;gap:8px;align-items:center}
-#stateBox .cd{width:90px;height:6px;background:rgba(255,255,255,.15);border-radius:3px;overflow:hidden}
-#stateBox .cd i{display:block;height:100%;background:var(--green);width:100%}
-#toasts{position:absolute;top:64px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;align-items:center;pointer-events:none}
-.toast{background:var(--bg);border:2px solid var(--line);padding:8px 14px;border-radius:6px;font-weight:700;font-size:14px}
-.toast.err{border-color:var(--red)}.toast.ok{border-color:var(--green)}
-#tags{position:absolute;inset:0;pointer-events:none}
-.bubbles{position:absolute;transform:translate(-50%,-100%);display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;width:240px}
-.bub{background:rgba(255,255,255,.96);color:#111;font-size:12px;font-weight:700;padding:5px 9px;border-radius:7px;max-width:240px;text-align:center;box-shadow:0 2px 0 rgba(0,0,0,.35);word-wrap:break-word;position:relative;animation:bubIn .18s ease-out}
-.bub:last-child::after{content:'';position:absolute;left:50%;bottom:-6px;margin-left:-6px;border:6px solid transparent;border-top-color:rgba(255,255,255,.96);border-bottom:0}
-.bub.fade{opacity:0;transition:opacity .4s}
-@keyframes bubIn{from{transform:translateY(6px) scale(.85);opacity:0}to{transform:none;opacity:1}}
-.tag{position:absolute;transform:translate(-50%,-100%);font-weight:800;font-size:13px;color:#fff;text-shadow:0 0 3px #000,0 0 5px #000,0 2px 2px #000;white-space:nowrap}
-#chargeBar{position:absolute;width:12px;height:110px;border:2px solid #fff;border-radius:4px;background:rgba(0,0,0,.55);transform:translate(0,-50%);overflow:hidden;pointer-events:none}
-#chargeBar i{position:absolute;left:0;bottom:0;width:100%;background:var(--yellow);height:0}
-#chargeBar.storm{border-color:#9fd4ff;box-shadow:0 0 10px #6fb4ff}#chargeBar.storm i{background:#9fd4ff}
-#chargeBar em{position:absolute;left:0;right:0;bottom:35%;height:2px;background:rgba(255,255,255,.7)}
-#serveAim{position:absolute;transform:translate(-50%,-50%);pointer-events:none;opacity:.95;width:140px;height:140px}
-#serveAim .ghost{position:absolute;left:50%;top:50%;width:26px;height:26px;margin:-13px 0 0 -13px;border-radius:50%!important;background:radial-gradient(circle at 35% 35%,#fff 0 20%,#e5484d 21% 100%);border:2px solid #000;z-index:2}
-#utilCards{position:absolute;bottom:14px;left:14px;display:flex;gap:10px}
-#crosshair{position:absolute;left:50%;top:50%;width:6px;height:6px;margin:-3px 0 0 -3px;border-radius:50%;background:#fff;box-shadow:0 0 3px #000;pointer-events:none}
-
-/* action cards */
-#actions{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:10px}
-.card{width:104px;height:118px;border-radius:10px;background:rgba(20,20,26,.9);border:2px solid rgba(255,255,255,.12);position:relative;overflow:hidden;box-shadow:inset 0 -26px 30px -18px rgba(255,120,30,.75)}
-.card img{position:absolute;left:50%;top:6px;width:78px;height:78px;transform:translateX(-50%);image-rendering:auto}
-.card .key{position:absolute;top:6px;left:6px;min-width:26px;height:24px;padding:0 5px;border-radius:5px;background:#fff;color:#111;font-size:12px;font-weight:900;display:flex;align-items:center;justify-content:center;border:2px solid #cfcfcf}
-.card .cdov{position:absolute;left:0;right:0;bottom:0;background:rgba(0,0,0,.65);pointer-events:none}
-.card .cdt{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:30px;font-weight:900;text-shadow:0 2px 0 #000,0 0 8px #000}
-.card .lbl{position:absolute;bottom:6px;left:0;right:0;text-align:center;font-size:15px;font-weight:900;text-shadow:0 2px 0 #000,0 0 6px #000;letter-spacing:.3px}
-.card.hold .lbl:after{content:" (HOLD)";font-size:9px;opacity:.8}
-
-/* panels */
-.panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:480px;max-width:94vw;max-height:90vh;overflow:auto;background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:16px 18px 18px}
-.panel h2{margin:0 0 12px;font-size:20px;font-weight:900;letter-spacing:.5px;display:flex;align-items:center;justify-content:space-between;text-transform:uppercase}
-.x{width:34px;height:34px;padding:0;border-radius:6px;background:var(--red);font-size:15px}
-.menu{display:flex;flex-direction:column;gap:8px}
-.menu button{font-size:15px;padding:13px;text-align:left;display:flex;justify-content:space-between;align-items:center;background:var(--bg2)}
-.menu button small{opacity:.6;font-weight:600}
-.field{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}
-.field label{font-size:11px;font-weight:800;color:#b9bfcc;letter-spacing:.6px;text-transform:uppercase}
-.tabs{display:flex;gap:6px;margin-bottom:12px}
-.tabs button{flex:1;background:var(--bg2);color:#cfd3dc}
-.tabs button.on{background:#fff;color:#111}
-.card2{background:var(--bg2);border-radius:8px;padding:12px 14px;margin-bottom:10px}
-.card2 h3{margin:0 0 8px;font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--yellow)}
-.row{display:flex;gap:8px;align-items:center}
-.row.between{justify-content:space-between}
-.money{font-size:22px;font-weight:900;color:var(--green)}
-.kb{display:flex;justify-content:space-between;align-items:center;background:var(--bg2);border-radius:6px;padding:9px 12px;margin-bottom:6px;font-size:15px;font-weight:800}
-.kb .key{min-width:64px;padding:5px 10px;border:2px solid #fff;border-radius:5px;background:#000;text-align:center;font-size:14px;cursor:pointer}
-.kb .key:hover{background:#333}
-.kb .key.listening{border-color:var(--yellow);color:var(--yellow)}
-.kbgrp{font-size:11px;font-weight:900;letter-spacing:.6px;text-transform:uppercase;color:var(--yellow);margin:12px 0 6px}
-.kbgrp:first-child{margin-top:0}
-.flist{display:flex;flex-direction:column;gap:6px;max-height:200px;overflow:auto}
-.fr{display:flex;justify-content:space-between;align-items:center;background:rgba(0,0,0,.3);border-radius:6px;padding:7px 10px;font-weight:700}
-.fr .st{width:8px;height:8px;border-radius:50%;background:#666;display:inline-block;margin-right:8px}
-.fr .st.on{background:var(--green)}
-.badge{background:var(--red);color:#fff;border-radius:10px;padding:1px 7px;font-size:11px;margin-left:6px}
-
-/* queue panel */
-#queuePanel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:560px;max-width:94vw;background:var(--bg);border:2px solid var(--line);border-radius:10px;padding:16px 18px 18px}
-#queuePanel h2{margin:0 0 12px;font-size:22px;font-weight:900;text-transform:uppercase;display:flex;justify-content:space-between;align-items:center}
-#mapPick button.on,#playMode button.on{background:#fff;color:#111}
-#queuePanel .team{background:var(--bg2);border-radius:8px;padding:12px 14px;min-height:200px}
-#queuePanel .team h3{margin:0 0 10px;font-size:13px;letter-spacing:.6px;text-transform:uppercase;color:#b9bfcc;border-bottom:2px solid var(--line);padding-bottom:6px}
-#queuePanel .mem{display:flex;align-items:center;gap:10px;background:rgba(0,0,0,.3);border-radius:6px;padding:8px 12px;margin-bottom:6px;font-size:16px;font-weight:800}
-#queuePanel .mem .av{width:32px;height:32px;border-radius:6px;background:#fff;color:#111;display:flex;align-items:center;justify-content:center;font-size:15px}
-#queuePanel .mem .lead{font-size:10px;background:var(--yellow);color:#221;border-radius:4px;padding:2px 6px;margin-left:auto}
-#queuePanel .bottom{display:flex;justify-content:space-between;align-items:center;margin-top:14px;flex-wrap:wrap;gap:10px}
-#queuePanel .lock{font-size:14px;font-weight:800;display:flex;align-items:center;gap:10px;text-transform:uppercase}
-#lockToggle{background:#000;border:2px solid var(--red);color:var(--red);padding:6px 14px}
-#lockToggle.on{border-color:var(--green);color:var(--green)}
-#queueBtn{padding:12px 40px;font-size:20px;background:var(--green);color:#0c2412}
-#queueBtn.cancel{background:var(--red);color:#fff}
-#queueStatus{position:absolute;top:12px;left:50%;transform:translateX(-50%);background:var(--bg);border:2px solid var(--green);border-radius:6px;padding:7px 12px;font-weight:800;display:flex;gap:12px;align-items:center;font-size:13px}
-
-/* match hud */
-#matchHud{position:absolute;inset:0;pointer-events:none}
-#matchHud>*{pointer-events:auto}
-#score{position:absolute;top:12px;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:14px;background:var(--bg);border-radius:8px;padding:6px 16px;font-size:26px;font-weight:900;border:2px solid var(--line)}
-#score .a{color:#fff}#score .b{color:#fff}
-#score small{font-size:10px;opacity:.7;display:block;text-align:center;font-weight:800;letter-spacing:.5px}
-#bigMsg{position:absolute;top:22%;left:50%;transform:translateX(-50%);font-size:46px;font-weight:900;text-shadow:0 3px 0 #000,0 0 14px rgba(0,0,0,.6);text-align:center;pointer-events:none;letter-spacing:1px;text-transform:uppercase}
-#touches{position:absolute;top:74px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
-#touches i{width:12px;height:12px;border-radius:2px;background:rgba(0,0,0,.4);border:2px solid #fff}
-#touches i.on{background:var(--yellow)}
-#leaveBtn{position:absolute;top:46px;left:12px}
-#serveHint{position:absolute;bottom:150px;left:50%;transform:translateX(-50%);background:var(--yellow);color:#221;padding:7px 14px;border-radius:6px;font-weight:900;font-size:13px}
-#lockHint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.25);font-size:20px;font-weight:900;cursor:pointer}
-#lockHint div{background:var(--bg);padding:16px 26px;border-radius:8px;border:2px solid var(--line);text-align:center}
-#lockHint small{display:block;font-size:12px;opacity:.75;margin-top:6px;font-weight:600}
-#loading{position:absolute;inset:0;background:#87c7ee;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:36px;font-weight:900;z-index:50;color:#fff;text-shadow:0 3px 0 rgba(0,0,0,.25)}
-#loading small{font-size:13px;font-weight:600;opacity:.8;margin-top:8px}
-#loadBar{width:320px;max-width:80vw;height:14px;border:2px solid #fff;border-radius:8px;background:rgba(0,0,0,.25);margin-top:14px;overflow:hidden}
-#loadBar i{display:block;height:100%;width:0;background:var(--yellow);transition:width .25s}
-#loadPct{font-size:12px;font-weight:800;opacity:.85;margin-top:6px}
-#ballMsg{position:absolute;transform:translate(-50%,-100%);background:#e5484d;color:#fff;font-weight:900;font-size:13px;padding:4px 8px;pointer-events:none;white-space:nowrap;text-transform:uppercase}
-*,*::before,*::after{border-radius:0!important}
+@media (max-width:900px){.mBody{width:100%}#menu:before{background:rgba(9,14,34,.95)}#menuClose{margin-right:0}.mNav{width:132px}.mNav button{font-size:13px;padding:11px 10px}#modeCards{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}#invDetail{width:160px}}
 </style>
 </head>
 <body>
 <canvas id="c" tabindex="0"></canvas>
 <div id="ui">
   <div id="touchUi" class="hidden">
-    <div id="joyZone" class="zone"></div><div id="lookZone" class="zone"></div>
+    <div id="joyZone" class="zone"></div>
     <div id="joy"><div id="joyBase"></div><div id="joyKnob"></div></div>
     <div class="tbtn big" data-act="jump">JUMP</div>
     <div class="tbtn big" data-act="action">SET</div>
@@ -284,136 +276,149 @@ canvas#c.impact{filter:grayscale(1) brightness(1.05) contrast(60)}   /* hard bla
     <div class="tbtn" data-act="dive">DIVE</div>
     <div class="tbtn" data-act="dash">DASH</div>
     <div class="tbtn" data-act="emote">EMOTE</div>
-    <div class="tbtn" data-act="lock">LOCK</div>
+    <div class="tbtn" data-act="menu">MENU</div>
     <div class="tbtn" data-act="ball">BALL</div>
     <div class="tbtn" data-act="serve">SERVE</div>
     <div id="touchEdit" class="hidden">Drag the buttons where you want them <button class="btn grey small" id="touchEditReset">RESET</button><button class="btn green small" id="touchEditDone">DONE</button></div>
   </div>
   <div id="loading">VOLLEYBALL GAEM<small id="loadMsg">Connecting...</small><div id="loadBar"><i></i></div><div id="loadPct">0%</div></div>
-  <div id="online"><span class="dot"></span><span><b id="onlineCount">0</b> online</span></div>
-  <div id="topbar">
-    <button id="userBtn">Guest</button>
-    <button id="menuBtn">MENU</button>
-    <button id="invBtn">INVENTORY</button>
-  </div>
+  <button id="menuChip"><b id="menuKey">M</b>MENU</button>
   <div id="queueStatus" class="hidden"><span id="queueStatusText">IN QUEUE</span><button class="btn red small" id="queueCancelBtn">CANCEL</button></div>
   <div id="toasts"></div>
-  <div id="tags"></div>
-  <div id="chargeBar" class="hidden"><i></i><em></em></div>
-  <div id="serveAim" class="hidden"><div class="ghost"></div><svg viewBox="0 0 100 100" width="140" height="140"><g fill="#fff" stroke="#000" stroke-width="3" stroke-linejoin="round"><polygon points="50,4 62,20 54,20 54,46 46,46 46,20 38,20"/><polygon points="50,96 62,80 54,80 54,54 46,54 46,80 38,80"/><polygon points="4,50 20,38 20,46 46,46 46,54 20,54 20,62"/><polygon points="96,50 80,38 80,46 54,46 54,54 80,54 80,62"/></g></svg></div>
   <div id="utilCards" class="hidden"></div>
-  <div id="ballMsg" class="hidden">TOO LOW</div>
-  <div id="impactTint" class="hidden"></div>
   <div id="impactFlash"></div>
-  <div id="npcPrompt" class="hidden"><b>E</b>Talk to Lil Man Dealer</div>
   <div id="chat">
-    <div class="ctabs"><button class="on" data-ct="global">Global</button><button data-ct="party">Party</button><span id="chatHint" style="font-size:10px;opacity:.6;align-self:center;margin-left:4px;font-weight:700">/ to chat</span></div>
+    <div class="ctabs"><button class="on" data-ct="global">Global</button><button data-ct="party">Party</button><span id="chatHint" style="font-size:10px;opacity:.7;align-self:center;margin-left:4px;font-weight:800">/ to chat</span></div>
     <div id="chatLog"></div>
     <input id="chatInput" maxlength="120" placeholder="Press / to chat..." autocomplete="off">
   </div>
-  <div id="wind" class="hidden"><i></i><span id="windTxt">WIND 0.0</span></div>
+  <div id="wind" class="hidden"><i>➤</i><span id="windTxt">WIND 0.0</span></div>
   <div id="emoteWheel" class="hidden"><div class="center">EMOTES</div></div>
   <div id="inviteBox" class="hidden"><span id="inviteText"></span><button class="btn green small" id="inviteAccept">ACCEPT</button><button class="btn red small" id="inviteDecline">DECLINE</button></div>
-  <div id="crosshair" class="hidden"></div>
   <div id="actions"></div>
-  <div id="lockHint" class="hidden"><div>CLICK TO LOCK CURSOR<small id="lockHintKeys">Shift lock is on. ESC frees the cursor.</small></div></div>
 
   <div id="matchHud" class="hidden">
-    <button class="btn red small" id="leaveBtn">LEAVE</button>
-    <div id="score"><div><span class="a" id="scoreA">0</span><small>BLACK</small></div><div>-</div><div><span class="b" id="scoreB">0</span><small>WHITE</small></div><div id="modeTxt" style="font-size:12px;opacity:.7"></div></div>
+    <button class="btn red small" id="leaveBtn">LEAVE MATCH</button>
+    <div id="score"><div><span id="scoreA">0</span><small>BLACK</small></div><div>-</div><div><span id="scoreB">0</span><small>WHITE</small></div><div id="modeTxt"></div></div>
     <div id="touches"><i></i><i></i><i></i></div>
     <div id="bigMsg"></div>
     <div id="serveHint" class="hidden"></div>
   </div>
 
-  <div id="settingsPanel" class="panel hidden" style="width:380px">
-    <h2>Menu<button class="x" data-close>X</button></h2>
-    <div class="menu">
-      <button id="sAccount"><span id="sAccountName">Guest</span><small>Account</small></button>
-      <button id="sInventory">Inventory<small>Cosmetics &amp; traits</small></button>
-      <button id="sKeys">Keybinds<small>Controls</small></button>
-      <button id="sFriends">Friends<small id="friendBadge"></small></button>
-      <button id="sParty">Party<small id="partyBadge"></small></button>
-      <div class="card2" style="margin:0"><h3>Touch controls</h3><div class="row"><select id="touchSel" style="flex:1;padding:8px;font-family:inherit;font-weight:800;background:#000;color:#fff;border:2px solid var(--line)"><option value="auto">Auto (touch screens)</option><option value="on">On</option><option value="off">Off</option></select><button class="btn blue small" id="touchEditBtn">Edit layout</button></div></div>
-      <div class="card2" style="margin:0"><h3>Shaders</h3><select id="shSel" style="width:100%;padding:8px;font-family:inherit;font-weight:800;background:#000;color:#fff;border:2px solid var(--line)"><option value="simple">Simple (default)</option><option value="full">Advanced (env lighting, wave water - needs a good GPU)</option></select><small id="shNote" style="display:block;opacity:.6;font-weight:600;margin-top:6px"></small></div>
-      <div class="card2" style="margin:0"><h3>Graphics</h3><select id="gfxSel" style="width:100%;padding:8px;font-family:inherit;font-weight:800;background:#000;color:#fff;border:2px solid var(--line)"><option value="high">High (shadows, full detail)</option><option value="medium">Medium (softer shadows, 1x pixels)</option><option value="low">Low (no shadows, fewer pixels)</option><option value="ultra">Ultra low (no effects, no animated scenery, classic balls)</option></select></div>
-      <div class="card2" style="margin:0"><h3>Field of view <span id="fovVal" style="color:#fff">70</span></h3><input type="range" id="fovSel" min="55" max="110" step="1" value="70" style="width:100%;padding:0;border:0;background:transparent"></div>
-      <div class="card2" style="margin:0"><h3>Time of day</h3><select id="todSel" style="width:100%;padding:8px;font-family:inherit;font-weight:800;background:#000;color:#fff;border:2px solid var(--line)"><option value="relative">Relative (real EST time)</option><option value="day">Day Time</option><option value="night">Night Time</option></select></div>
-      <button id="sResume">Resume</button>
+  <!-- ================= the one menu (M) ================= -->
+  <div id="menu" class="hidden">
+    <div class="mTop">
+      <div class="mProfile"><canvas id="mAvatar" width="104" height="104"></canvas><div><div class="mName" id="mName">Guest</div><div class="mSub" id="mSub">GUEST</div></div></div>
+      <div class="mCur"><span class="coin">$</span><b id="mMoney">0</b></div>
+      <div class="mOnline"><span class="dot" id="onlineDot"></span><b id="onlineCount">0</b> ONLINE</div>
+      <button id="menuClose"><b id="menuKey2">M</b>CLOSE</button>
     </div>
-  </div>
+    <div class="mBody">
+      <nav class="mNav">
+        <button data-sec="play" class="on"><span>PLAY</span></button>
+        <button data-sec="inventory"><span>INVENTORY</span></button>
+        <button data-sec="shop"><span>SHOP</span></button>
+        <button data-sec="quests"><span>QUESTS</span></button>
+        <button data-sec="social"><span>FRIENDS</span><span id="friendBadge"></span></button>
+        <button data-sec="settings"><span>SETTINGS</span></button>
+      </nav>
 
-  <div id="accountPanel" class="panel hidden" style="width:420px">
-    <h2>Account<button class="x" data-close>X</button></h2>
-    <div id="accGuest">
-      <div class="tabs"><button class="on" id="tabLogin">Log In</button><button id="tabSignup">Sign Up</button></div>
-      <div class="field"><label>Username</label><input id="accUser" maxlength="16" placeholder="3-16 letters, numbers, _"></div>
-      <div class="field"><label>Password</label><input id="accPass" type="password" maxlength="64" placeholder="at least 4 characters"></div>
-      <div class="row between"><small style="opacity:.6;font-weight:600">You are <b id="accGuestName">Guest</b></small><button class="btn green" id="accSubmit">LOG IN</button></div>
-    </div>
-    <div id="accUser2" class="hidden">
-      <div class="card2"><div class="row between"><div>Logged in as<br><b style="font-size:20px" id="accName"></b></div><div style="text-align:right"><div style="font-size:10px;opacity:.7;font-weight:800">DOLLARS</div><div class="money" id="accMoney">$0</div></div></div></div>
-      <div class="card2"><h3>Change password</h3>
-        <div class="field"><label>Current password</label><input id="cpOld" type="password"></div>
-        <div class="field"><label>New password</label><input id="cpNew" type="password"></div>
-        <button class="btn small blue" id="cpBtn">Change password</button></div>
-      <div class="card2"><h3>Change username - $5,000</h3>
-        <div class="field"><label>New username</label><input id="cuNew" maxlength="16"></div>
-        <div class="field"><label>Password</label><input id="cuPass" type="password"></div>
-        <button class="btn small blue" id="cuBtn">Change username ($5,000)</button></div>
-      <button class="btn red" id="logoutBtn" style="width:100%">LOG OUT</button>
-    </div>
-  </div>
+      <div class="mSec" id="sec-play">
+        <h2>Play <small id="playSub">Pick a mode. Your party is your team.</small></h2>
+        <div id="modeCards">
+          <button class="mode m2" data-mode="2v2"><span class="mc" id="mc2v2">BEACH</span><span class="mt">2v2</span><span class="md">Beach doubles</span></button>
+          <button class="mode m3" data-mode="3v3"><span class="mc" id="mc3v3">INDOOR</span><span class="mt">3v3</span><span class="md">Indoor triples</span></button>
+          <button class="mode m6" data-mode="6v6"><span class="mc" id="mc6v6">INDOOR</span><span class="mt">6v6</span><span class="md">Full teams</span></button>
+          <button class="mode mp" data-mode="practice"><span class="mc">FREE</span><span class="mt">PRAC</span><span class="md">Practice court</span></button>
+        </div>
+        <div class="toggles">
+          <div class="tgl" id="playMode">PLAY <button data-pm="online">ONLINE</button><button data-pm="bots">VS BOTS</button></div>
+          <div class="tgl hidden" id="mapPick">MAP <button data-map="indoor">INDOORS</button><button data-map="beach">BEACH</button></div>
+          <div class="tgl" id="lockRow">FRIENDS ONLY <button id="lockToggle">OFF</button></div>
+        </div>
+        <div class="pane"><h3>Your team</h3><div id="teamList"></div><div class="row" style="margin-top:6px"><button class="btn grey small" id="teamInvite">INVITE FRIENDS</button></div></div>
+        <div class="row" style="gap:16px;flex-wrap:wrap"><button id="queueBtn">QUEUE</button><span id="queueInfo" style="font-weight:900;font-style:italic"></span></div>
+        <div id="playNote"></div>
+      </div>
 
-  <div id="keysPanel" class="panel hidden" style="width:420px">
-    <h2>Keybinds<button class="x" data-close>X</button></h2>
-    <div id="kbList"></div>
-    <div class="row between" style="margin-top:10px;gap:10px"><small style="opacity:.6;font-weight:600;flex:1">Click a key, then press the new key or mouse button. ESC always closes menus.</small><button class="btn grey small" id="kbLefty">Left-handed</button><button class="btn grey small" id="kbReset">Reset</button></div>
-  </div>
+      <div class="mSec hidden" id="sec-inventory">
+        <h2>Inventory</h2>
+        <div class="subtabs" id="invNav"><button class="on" data-inv="skins">Balls</button><button data-inv="models">Characters</button><button data-inv="fx">Score FX</button><button data-inv="emotes">Emotes</button><button data-inv="traits">Traits</button></div>
+        <div id="invBody">
+          <div id="invMain"><div id="invGrid"></div><div id="invDetail"></div></div>
+          <div id="invTraits" class="hidden">
+            <div id="loadout"></div>
+            <div id="bagTitle">Your traits &amp; boxes</div>
+            <div id="invBag"></div>
+          </div>
+        </div>
+      </div>
 
-  <div id="friendsPanel" class="panel hidden" style="width:420px">
-    <h2>Friends<button class="x" data-close>X</button></h2>
-    <div id="frGuest" class="card2">Sign in to add friends.</div>
-    <div id="frMain" class="hidden">
-      <div class="card2"><h3>Add friend</h3><div class="row"><input id="frAddName" placeholder="username"><button class="btn small green" id="frAddBtn">SEND</button></div></div>
-      <div class="card2"><h3>Requests <span id="frReqCount"></span></h3><div class="flist" id="frReqs"></div></div>
-      <div class="card2"><h3>Friends</h3><div class="flist" id="frList"></div></div>
-    </div>
-  </div>
+      <div class="mSec hidden" id="sec-shop">
+        <h2>Shop</h2>
+        <div class="subtabs" id="shopTabs"><button class="on" data-tab="skins">Balls</button><button data-tab="models">Characters</button><button data-tab="fx">Score FX</button><button data-tab="emotes">Emotes</button><button data-tab="boxes">Trait Boxes</button></div>
+        <div id="shopDealer"><canvas id="dealerPic" width="112" height="112"></canvas><div><b id="shopTitle">Lil Man Dealer</b><span id="shopNote"></span></div></div>
+        <div class="grid" id="shopGrid"></div>
+        <div id="traitPeek" class="pane hidden" style="margin-top:12px"><h3 id="traitPeekTitle">Hover a box to see what's inside</h3><div id="traitPeekCards"></div></div>
+      </div>
 
-  <div id="partyPanel" class="panel hidden" style="width:440px">
-    <h2>Party<button class="x" data-close>X</button></h2>
-    <div id="partyNone"><div class="card2">You're not in a party. Create one, invite players, and the party follows you into any queue.</div><button class="btn green" id="partyCreate" style="width:100%">CREATE PARTY</button></div>
-    <div id="partyMain" class="hidden">
-      <div class="card2"><h3>Members</h3><div id="partyMembers"></div></div>
-      <div class="card2"><h3>Invite</h3><div class="row"><input id="partyInviteName" placeholder="player name"><button class="btn small green" id="partyInviteBtn">INVITE</button></div><div id="partyOnline" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div></div>
-      <button class="btn red" id="partyLeave" style="width:100%">LEAVE PARTY</button>
-    </div>
-  </div>
+      <div class="mSec hidden" id="sec-quests">
+        <h2>Quests <span class="soon">COMING SOON</span></h2>
+        <div id="questList"></div>
+      </div>
 
-  <div id="shopPanel" class="panel shopish hidden" style="width:560px">
-    <h2><span id="shopTitle">Lil Man Dealer</span><span style="font-size:14px;color:var(--green)" id="shopMoney">$0</span><button class="x" data-close>X</button></h2>
-    <div class="tabs"><button class="on" data-tab="skins">Ball Skins</button><button data-tab="models">Characters</button><button data-tab="fx">Score Effects</button><button data-tab="emotes">Emotes</button></div>
-    <div id="shopNote" style="font-size:12px;opacity:.7;font-weight:600;margin-bottom:10px">Ball skins. Same size, same hitbox - looks only.</div>
-    <div class="grid" id="shopGrid"></div>
-  </div>
+      <div class="mSec hidden" id="sec-social">
+        <h2>Friends &amp; Party</h2>
+        <div class="cols">
+          <div>
+            <div id="frGuest" class="pane">Log in (Settings &gt; Account) to add friends.</div>
+            <div id="frMain" class="hidden">
+              <div class="pane"><h3>Add friend</h3><div class="row"><input id="frAddName" placeholder="username"><button class="btn small green" id="frAddBtn">SEND</button></div></div>
+              <div class="pane"><h3>Requests <span id="frReqCount"></span></h3><div class="flist" id="frReqs"></div></div>
+              <div class="pane"><h3>Friends</h3><div class="flist" id="frList"></div></div>
+            </div>
+          </div>
+          <div>
+            <div id="partyNone"><div class="pane">You're not in a party. Create one and invite players - your party is your team when you queue.</div><button class="btn green" id="partyCreate" style="width:100%">CREATE PARTY</button></div>
+            <div id="partyMain" class="hidden">
+              <div class="pane"><h3>Party <span id="partyBadge"></span></h3><div id="partyMembers"></div></div>
+              <div class="pane"><h3>Invite</h3><div class="row"><input id="partyInviteName" placeholder="player name"><button class="btn small green" id="partyInviteBtn">INVITE</button></div><div id="partyOnline" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:6px"></div></div>
+              <button class="btn red" id="partyLeave" style="width:100%">LEAVE PARTY</button>
+            </div>
+          </div>
+        </div>
+      </div>
 
-  <div id="traitPanel" class="panel shopish hidden" style="width:560px">
-    <h2><span>Big Man Dealer</span><span style="font-size:14px;color:var(--green)" id="traitMoney">$0</span><button class="x" data-close>X</button></h2>
-    <div style="font-size:12px;opacity:.7;font-weight:600;margin-bottom:10px">Trait boxes. Every box holds 3 trait cards - 2 passives and 1 ability. Buy one, then open it from the Traits tab of your Inventory.</div>
-    <div class="grid" id="traitGrid"></div>
-    <div id="traitPeek" class="card2" style="margin:12px 0 0"><h3 id="traitPeekTitle">Hover a box to see what's inside</h3><div id="traitPeekCards"></div></div>
-  </div>
-
-  <div id="invPanel" class="panel hidden">
-    <h2><span>Inventory</span><span style="font-size:14px;color:var(--green)" id="invMoney">$0</span><button class="x" data-close>X</button></h2>
-    <div id="invBody">
-      <div id="invNav"><button class="on" data-inv="skins">Balls</button><button data-inv="models">Characters</button><button data-inv="fx">Score FX</button><button data-inv="emotes">Emotes</button><button data-inv="traits">Traits</button></div>
-      <div id="invMain"><div id="invGrid"></div><div id="invDetail"></div></div>
-      <div id="invTraits" class="hidden">
-        <div id="loadout"></div>
-        <div id="bagTitle">Your traits &amp; boxes</div>
-        <div id="invBag"></div>
+      <div class="mSec hidden" id="sec-settings">
+        <h2>Settings</h2>
+        <div class="subtabs" id="setNav"><button class="on" data-set="account">Account</button><button data-set="controls">Controls</button><button data-set="game">Game</button></div>
+        <div id="set-account">
+          <div id="accGuest" class="pane" style="max-width:440px">
+            <div class="subtabs"><button class="on" id="tabLogin">Log In</button><button id="tabSignup">Sign Up</button></div>
+            <div class="field"><label>Username</label><input id="accUser" maxlength="16" placeholder="3-16 letters, numbers, _"></div>
+            <div class="field"><label>Password</label><input id="accPass" type="password" maxlength="64" placeholder="at least 4 characters"></div>
+            <div class="row between"><small style="opacity:.7;font-weight:700">You are <b id="accGuestName">Guest</b></small><button class="btn green" id="accSubmit">LOG IN</button></div>
+          </div>
+          <div id="accUser2" class="hidden" style="max-width:520px">
+            <div class="pane"><div class="row between"><div>Logged in as<br><b style="font-size:20px" id="accName"></b></div><div style="text-align:right"><div style="font-size:10px;opacity:.7;font-weight:900">DOLLARS</div><div class="money" id="accMoney">$0</div></div></div></div>
+            <div class="cols">
+              <div class="pane"><h3>Change password</h3><div class="field"><label>Current password</label><input id="cpOld" type="password"></div><div class="field"><label>New password</label><input id="cpNew" type="password"></div><button class="btn small blue" id="cpBtn">Change password</button></div>
+              <div class="pane"><h3>Change username - $5,000</h3><div class="field"><label>New username</label><input id="cuNew" maxlength="16"></div><div class="field"><label>Password</label><input id="cuPass" type="password"></div><button class="btn small blue" id="cuBtn">Change ($5,000)</button></div>
+            </div>
+            <button class="btn red" id="logoutBtn" style="width:100%">LOG OUT</button>
+          </div>
+        </div>
+        <div id="set-controls" class="hidden">
+          <div class="cols">
+            <div class="pane"><h3>Keybinds</h3><div id="kbList"></div><div class="row" style="margin-top:10px"><small style="opacity:.7;font-weight:700;flex:1">Click a key, then press the new key or mouse button. ESC always closes.</small><button class="btn grey small" id="kbLefty">Left-handed</button><button class="btn grey small" id="kbReset">Reset</button></div></div>
+            <div class="pane"><h3>Touch controls</h3><div class="row"><select id="touchSel" style="flex:1"><option value="auto">Auto (touch screens)</option><option value="on">On</option><option value="off">Off</option></select><button class="btn blue small" id="touchEditBtn">Edit layout</button></div></div>
+          </div>
+        </div>
+        <div id="set-game" class="hidden" style="max-width:520px">
+          <div class="pane"><h3>Graphics</h3><select id="gfxSel"><option value="high">High (all effects, crisp pixels)</option><option value="medium">Medium (all effects, 1x pixels)</option><option value="low">Low (fewer particles, lower resolution)</option><option value="ultra">Ultra low (no effects, still scenery, classic balls)</option></select></div>
+          <div class="pane"><h3>Lobby camera zoom <span id="zoomVal" style="color:#fff">100%</span></h3><input type="range" id="zoomSel" min="70" max="140" step="5" value="100" style="padding:0;border:0;background:transparent"></div>
+          <div class="pane"><h3>Time of day</h3><select id="todSel"><option value="relative">Relative (real EST time)</option><option value="day">Day Time</option><option value="night">Night Time</option></select></div>
+        </div>
       </div>
     </div>
   </div>
@@ -429,20 +434,8 @@ canvas#c.impact{filter:grayscale(1) brightness(1.05) contrast(60)}   /* hard bla
       <button class="btn green" id="openDone">CONTINUE</button>
     </div>
   </div>
-
-  <div id="queuePanel" class="hidden">
-    <h2><span id="queueTitle">Queue - 2v2</span><button class="x" id="queueX">X</button></h2>
-    <div id="playMode" class="hidden" style="display:flex;gap:8px;align-items:center;margin-bottom:10px;font-weight:800;font-size:13px">PLAY <button class="btn small grey" data-pm="online">ONLINE</button><button class="btn small grey" data-pm="bots">BOTS</button></div>
-    <div id="mapPick" class="hidden" style="display:flex;gap:8px;align-items:center;margin-bottom:10px;font-weight:800;font-size:13px">MAP <button class="btn small grey" data-map="indoor">INDOORS</button><button class="btn small grey" data-map="beach">BEACH</button></div>
-    <div class="team"><h3>Your Team</h3><div id="teamList"></div></div>
-    <div class="bottom">
-      <div class="lock">Lock to friends only <button id="lockToggle">OFF</button></div>
-      <button id="queueBtn">QUEUE</button>
-    </div>
-  </div>
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
 <script>

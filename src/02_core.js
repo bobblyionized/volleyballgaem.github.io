@@ -1,5 +1,5 @@
 /* =====================================================================
-   VOLLEYBALL GAEM  —  core: utils, firebase, identity, keybinds, UI
+   VOLLEYBALL GAEM  —  core: utils, firebase, identity, keybinds, menu
    ===================================================================== */
 'use strict';
 const $ = s => document.querySelector(s);
@@ -94,38 +94,37 @@ const SID = 's' + rnd() + Date.now().toString(36);   // unique per tab
 const me = { sid: SID, id: SID, name: 'Guest', guest: true, dollars: 0, friends: {}, requests: {}, lower: null, skins: {}, skin: 'default', fxs: {}, fx: 'none', model: 'boy', models: {}, emotes: {}, wheel: {}, boxes: {}, traits: {}, loadout: {} };
 
 /* ---------------- Keybinds ---------------- */
-/* Every control the game reads goes through KEYS — movement, shift lock, chat and the menu included,
-   so a player can move the whole scheme to whichever hand they like. Escape always closes panels on top
-   of whatever it is bound to, so a bad binding can never trap you with the cursor locked. */
+/* Every control the game reads goes through KEYS. In 2D: A / D run, W / S aim (spike, block, bump strength,
+   jump set) and climb onto / drop off the stairs. Escape always closes the menu on top of whatever it is bound to. */
 const KEY_DEFAULTS = {
   moveF: 'KeyW', moveB: 'KeyS', moveL: 'KeyA', moveR: 'KeyD',
   block: 'KeyQ', bump: 'KeyQ', dive: 'ControlLeft', jumpSet: 'KeyE', ability: 'KeyR',
   groundSet: 'Mouse0', spike: 'Mouse0', toss: 'Mouse0', spawnBall: 'KeyG', serve: 'Digit1', jump: 'Space', interact: 'KeyE', emote: 'KeyB',
-  shiftLock: 'ShiftLeft', chat: 'Slash', menu: 'Escape'
+  chat: 'Slash', menu: 'KeyM'
 };
 // mirrored to the right of the keyboard, for players who hold the mouse in their left hand
 const KEY_LEFTY = {
   moveF: 'ArrowUp', moveB: 'ArrowDown', moveL: 'ArrowLeft', moveR: 'ArrowRight',
   block: 'KeyP', bump: 'KeyP', dive: 'ControlRight', jumpSet: 'KeyO', ability: 'KeyU',
   groundSet: 'Mouse0', spike: 'Mouse0', toss: 'Mouse0', spawnBall: 'KeyL', serve: 'Digit0', jump: 'Space', interact: 'KeyO', emote: 'Semicolon',
-  shiftLock: 'ShiftRight', chat: 'Slash', menu: 'Escape'
+  chat: 'Slash', menu: 'KeyM'
 };
 const KEY_LABELS = {
-  moveF: 'Move Forward', moveB: 'Move Back', moveL: 'Move Left', moveR: 'Move Right',
+  moveF: 'Up (aim high / climb stairs)', moveB: 'Down (aim low / drop off stairs)', moveL: 'Run Left', moveR: 'Run Right',
   block: 'Block', bump: 'Bump', dive: 'Dive', ability: 'Ability', jumpSet: 'Jump Set', groundSet: 'Ground Set',
   spike: 'Spike', toss: 'Toss / Serve toss', spawnBall: 'Spawn Ball', serve: 'Serve', jump: 'Jump', interact: 'Interact', emote: 'Emote Wheel',
-  shiftLock: 'Shift Lock', chat: 'Chat', menu: 'Menu / Close'
+  chat: 'Chat', menu: 'Menu'
 };
 const KEY_GROUPS = [
-  ['Movement', ['moveF', 'moveB', 'moveL', 'moveR', 'jump', 'dive', 'ability']],
+  ['Movement', ['moveL', 'moveR', 'moveF', 'moveB', 'jump', 'dive', 'ability']],
   ['Ball', ['bump', 'groundSet', 'jumpSet', 'block', 'spike', 'toss', 'serve', 'spawnBall']],
-  ['Interface', ['shiftLock', 'emote', 'interact', 'chat', 'menu']]
+  ['Interface', ['menu', 'emote', 'interact', 'chat']]
 ];
 let KEYS = Object.assign({}, KEY_DEFAULTS);
-try { const s = JSON.parse(localStorage.getItem('vg_keys') || 'null'); if (s) KEYS = Object.assign({}, KEY_DEFAULTS, s); } catch (e) { }
+try { const s = JSON.parse(localStorage.getItem('vg_keys2d') || 'null'); if (s) KEYS = Object.assign({}, KEY_DEFAULTS, s); } catch (e) { }
 const BOUND = new Set();                     // every code currently in use, so the browser's own shortcut can be suppressed
 function keyName(code) {
-  if (!code) return '—';
+  if (!code) return '-';
   if (code.startsWith('Mouse')) return 'M' + (parseInt(code.slice(5)) + 1);
   if (code.startsWith('Key')) return code.slice(3);
   if (code.startsWith('Digit')) return code.slice(5);
@@ -140,12 +139,12 @@ function keyName(code) {
   };
   return m[code] || code.toUpperCase();
 }
-const moveKeysLabel = () => ['moveF', 'moveL', 'moveB', 'moveR'].map(a => keyName(KEYS[a])).join('');   // "WASD", "↑←↓→", …
+const moveKeysLabel = () => keyName(KEYS.moveL) + '/' + keyName(KEYS.moveR);
 function applyKeys() {                       // rebuild the lookup set and refresh anything that spells a key out
   BOUND.clear(); for (const a in KEYS) if (KEYS[a]) BOUND.add(KEYS[a]);
   const ci = $('#chatInput'); if (ci) ci.placeholder = `Press ${keyName(KEYS.chat)} to chat...`;
   const ch = $('#chatHint'); if (ch) ch.textContent = `${keyName(KEYS.chat)} to chat`;
-  const lh = $('#lockHintKeys'); if (lh) lh.textContent = `${keyName(KEYS.shiftLock)} toggles shift lock. ESC frees the cursor.`;
+  for (const id of ['#menuKey', '#menuKey2']) { const el = $(id); if (el) el.textContent = keyName(KEYS.menu); }
 }   // the action cards rebuild themselves: updateCards() keys its signature off KEYS
 let rebinding = null;
 function renderKeys() {
@@ -166,21 +165,40 @@ function renderKeys() {
 }
 function setBind(code) {
   if (!rebinding) return;
+  if (code === 'Escape' && rebinding !== 'menu') { rebinding = null; renderKeys(); return; }
   KEYS[rebinding] = code; rebinding = null;
-  try { localStorage.setItem('vg_keys', JSON.stringify(KEYS)); } catch (e) { }
+  try { localStorage.setItem('vg_keys2d', JSON.stringify(KEYS)); } catch (e) { }
   applyKeys(); renderKeys();
 }
-function usePreset(preset, msg) { KEYS = Object.assign({}, preset); try { localStorage.setItem('vg_keys', JSON.stringify(KEYS)); } catch (e) { } applyKeys(); renderKeys(); toast(msg); }
-$('#kbReset').onclick = () => { localStorage.removeItem('vg_keys'); usePreset(KEY_DEFAULTS, 'Default layout'); };
+function usePreset(preset, msg) { KEYS = Object.assign({}, preset); try { localStorage.setItem('vg_keys2d', JSON.stringify(KEYS)); } catch (e) { } applyKeys(); renderKeys(); toast(msg); }
+$('#kbReset').onclick = () => { try { localStorage.removeItem('vg_keys2d'); } catch (e) { } usePreset(KEY_DEFAULTS, 'Default layout'); };
 $('#kbLefty').onclick = () => usePreset(KEY_LEFTY, 'Left-handed layout');
 applyKeys();
 
-/* ---------------- Panels ---------------- */
-const PANELS = ['#settingsPanel', '#accountPanel', '#keysPanel', '#friendsPanel', '#queuePanel', '#shopPanel', '#partyPanel', '#traitPanel', '#invPanel'];
-function openPanel(sel) { PANELS.forEach(p => $(p).classList.add('hidden')); if (sel) { $(sel).classList.remove('hidden'); if (document.pointerLockElement) document.exitPointerLock(); } }
-function closePanels() { PANELS.forEach(p => $(p).classList.add('hidden')); $('#openFx').classList.add('hidden'); $('#confirmBox').classList.add('hidden'); rebinding = null; }
-function uiOpen() { return PANELS.some(p => !$(p).classList.contains('hidden')) || !$('#openFx').classList.contains('hidden') || !$('#confirmBox').classList.contains('hidden'); }
-function confirmDialog(title, text, okLabel = 'DELETE') {          // yes / no overlay on top of whatever panel is open; resolves true only on the red button
+/* ---------------- The menu ----------------
+   One menu, opened with M: PLAY (queue), INVENTORY, SHOP, QUESTS, FRIENDS & PARTY, SETTINGS.
+   It covers the left of the screen; the lobby keeps running on the right and you can still walk and jump. */
+let menuSec = 'play';
+const SECTIONS = ['play', 'inventory', 'shop', 'quests', 'social', 'settings'];
+function menuOpen() { return !$('#menu').classList.contains('hidden'); }
+function openMenu(sec) {
+  if (sec) menuSec = sec;
+  $('#menu').classList.remove('hidden'); $('#menuChip').classList.add('hidden');
+  showSection(menuSec);
+}
+function closeMenu() { $('#menu').classList.add('hidden'); $('#menuChip').classList.remove('hidden'); rebinding = null; if (typeof onMenuClosed === 'function') onMenuClosed(); }
+function showSection(sec) {
+  menuSec = sec;
+  $$('.mNav button').forEach(b => b.classList.toggle('on', b.dataset.sec === sec));
+  for (const s of SECTIONS) $('#sec-' + s).classList.toggle('hidden', s !== sec);
+  if (typeof renderSection === 'function') renderSection(sec);
+}
+$$('.mNav button').forEach(b => b.onclick = () => showSection(b.dataset.sec));
+$('#menuClose').onclick = () => closeMenu();
+$('#menuChip').onclick = () => menuOpen() ? closeMenu() : openMenu();
+function closePanels() { closeMenu(); $('#openFx').classList.add('hidden'); $('#confirmBox').classList.add('hidden'); rebinding = null; }
+function uiOpen() { return menuOpen() || !$('#openFx').classList.contains('hidden') || !$('#confirmBox').classList.contains('hidden'); }
+function confirmDialog(title, text, okLabel = 'DELETE') {          // yes / no overlay on top of the menu; resolves true only on the red button
   return new Promise(res => {
     const box = $('#confirmBox'); $('#confirmTitle').textContent = title; $('#confirmText').textContent = text; $('#confirmYes').textContent = okLabel;
     box.classList.remove('hidden');
@@ -188,23 +206,21 @@ function confirmDialog(title, text, okLabel = 'DELETE') {          // yes / no o
     $('#confirmYes').onclick = () => done(true); $('#confirmNo').onclick = () => done(false);
   });
 }
-$$('[data-close]').forEach(b => b.onclick = () => { closePanels(); });
-$('#menuBtn').onclick = () => uiOpen() ? closePanels() : openPanel('#settingsPanel');
-$('#invBtn').onclick = () => { const open = !$('#invPanel').classList.contains('hidden'); if (open) closePanels(); else if (typeof openInventory === 'function') openInventory(); };
-$('#userBtn').onclick = () => { openPanel('#accountPanel'); renderAccount(); };
-$('#sAccount').onclick = () => { openPanel('#accountPanel'); renderAccount(); };
-$('#sKeys').onclick = () => { openPanel('#keysPanel'); renderKeys(); };
-$('#sInventory').onclick = () => { if (typeof openInventory === 'function') openInventory(); };
-$('#sFriends').onclick = () => { openPanel('#friendsPanel'); renderFriends(); };
-$('#sResume').onclick = () => closePanels();
-$('#sParty').onclick = () => { openPanel('#partyPanel'); if (typeof renderParty === 'function') renderParty(); };
+let setSec = 'account';
+$$('#setNav button').forEach(b => b.onclick = () => { setSec = b.dataset.set; renderSettings(); });
+function renderSettings() {
+  $$('#setNav button').forEach(b => b.classList.toggle('on', b.dataset.set === setSec));
+  for (const s of ['account', 'controls', 'game']) $('#set-' + s).classList.toggle('hidden', s !== setSec);
+  if (setSec === 'account') renderAccount(); else if (setSec === 'controls') renderKeys();
+}
 
 /* ---------------- Identity / accounts ---------------- */
 const presenceRef = db.ref('presence/' + SID);
 function applyIdentityUI() {
-  $('#userBtn').textContent = me.name;
-  $('#sAccountName').textContent = me.name;
-  $('#accGuestName').textContent = me.name;
+  $('#mName').textContent = me.name; $('#accGuestName').textContent = me.name;
+  $('#mSub').textContent = me.guest ? 'GUEST - LOG IN TO SAVE' : 'VOLLEYBALL GAEM PLAYER';
+  $('#mMoney').textContent = me.guest ? '0' : (me.dollars || 0).toLocaleString();
+  if (typeof drawAvatar === 'function') drawAvatar();
 }
 async function pickGuestName() {
   let used = new Set();
@@ -292,7 +308,7 @@ function addDollars(n) {
 
 /* account panel */
 let accMode = 'login';
-$('#tabLogin').onclick = () => { accMode = 'login'; renderAccount(); };
+$('#tabLogin').onclick = () => { accMode = 'login'; renderAccount(); };   // (the account form lives in Settings > Account)
 $('#tabSignup').onclick = () => { accMode = 'signup'; renderAccount(); };
 function renderAccount() {
   $('#accGuest').classList.toggle('hidden', !me.guest);
@@ -318,17 +334,17 @@ db.ref('presence').on('value', snap => {
   onlineIds.clear(); let n = 0;
   snap.forEach(c => { const v = c.val(); if (!v) return; n++; onlineIds.set(v.id, (onlineIds.get(v.id) || 0) + 1); });
   $('#onlineCount').textContent = n;
-  if (!$('#friendsPanel').classList.contains('hidden')) renderFriends();
+  if (menuOpen() && menuSec === 'social') renderFriends();
 });
 function onIdentityChanged() {
   if (profileUnsub) profileUnsub(); if (friendsUnsub) friendsUnsub(); if (reqUnsub) reqUnsub();
   profileUnsub = friendsUnsub = reqUnsub = null;
   if (!me.guest) {
-    const pr = db.ref('profiles/' + me.id); const cb = pr.on('value', s => { const v = s.val(); if (v) { me.dollars = v.dollars || 0; if (v.name) me.name = v.name; me.skins = v.skins || {}; me.skin = v.skin || 'default'; me.fxs = v.fxs || {}; me.fx = v.fx || 'none'; me.model = v.model || 'boy'; me.models = v.models || {}; me.emotes = v.emotes || {}; me.wheel = v.wheel || {}; me.boxes = v.boxes || {}; me.traits = v.traits || {}; me.loadout = v.loadout || {}; if (typeof onCosmeticsChanged === 'function') onCosmeticsChanged(); applyIdentityUI(); if (!$('#accountPanel').classList.contains('hidden')) renderAccount(); if (typeof renderShop === 'function' && !$('#shopPanel').classList.contains('hidden')) renderShop(); if (typeof renderTraitShop === 'function' && !$('#traitPanel').classList.contains('hidden')) renderTraitShop(); if (typeof renderInventory === 'function' && !$('#invPanel').classList.contains('hidden')) renderInventory(); } });
+    const pr = db.ref('profiles/' + me.id); const cb = pr.on('value', s => { const v = s.val(); if (v) { me.dollars = v.dollars || 0; if (v.name) me.name = v.name; me.skins = v.skins || {}; me.skin = v.skin || 'default'; me.fxs = v.fxs || {}; me.fx = v.fx || 'none'; me.model = v.model || 'boy'; me.models = v.models || {}; me.emotes = v.emotes || {}; me.wheel = v.wheel || {}; me.boxes = v.boxes || {}; me.traits = v.traits || {}; me.loadout = v.loadout || {}; if (typeof onCosmeticsChanged === 'function') onCosmeticsChanged(); applyIdentityUI(); if (menuOpen()) showSection(menuSec); } });
     profileUnsub = () => pr.off('value', cb);
     const fr = db.ref('friends/' + me.id); const cb2 = fr.on('value', s => { me.friends = s.val() || {}; renderFriends(); });
     friendsUnsub = () => fr.off('value', cb2);
-    const rq = db.ref('requests/' + me.id); const cb3 = rq.on('value', s => { me.requests = s.val() || {}; renderFriends(); const n = Object.keys(me.requests).length; $('#friendBadge').innerHTML = n ? `<span class="badge">${n}</span>` : ''; });
+    const rq = db.ref('requests/' + me.id); const cb3 = rq.on('value', s => { me.requests = s.val() || {}; renderFriends(); const n = Object.keys(me.requests).length; $('#friendBadge').innerHTML = n ? ` <span class="badge">${n}</span>` : ''; });
     reqUnsub = () => rq.off('value', cb3);
   } else { $('#friendBadge').innerHTML = ''; renderFriends(); }
   if (typeof onIdentityChangedGame === 'function') onIdentityChangedGame();
