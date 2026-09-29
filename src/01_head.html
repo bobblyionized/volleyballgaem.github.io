@@ -83,7 +83,11 @@ input:focus,select:focus{border-color:var(--yellow)}
 .sbScore{position:absolute;top:50px;width:62px;height:26px;background:linear-gradient(#ffe85a,#ffc800);color:#231800;font-size:21px;font-weight:900;display:flex;align-items:center;justify-content:center;clip-path:polygon(12% 0,100% 0,88% 100%,0 100%)}
 #scoreA{right:calc(50% + 40px)}#scoreB{left:calc(50% + 40px);clip-path:polygon(0 0,88% 0,100% 100%,12% 100%)}
 #modeTxt{position:absolute;top:80px;left:50%;transform:translateX(-50%);font-size:11px;opacity:.75;font-style:italic;font-weight:800;white-space:nowrap}
-#touches{position:absolute;top:104px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+#spikeInfo{position:absolute;top:100px;left:50%;transform:translateX(-50%);display:flex;gap:46px;pointer-events:none;opacity:0;transition:opacity .35s;white-space:nowrap}
+#spikeInfo.on{opacity:1;transition:opacity .08s}
+#spikeInfo div{font-size:44px;font-weight:900;color:#fff;letter-spacing:-1px;text-shadow:0 3px 0 rgba(0,0,0,.35),0 0 14px rgba(0,0,0,.25)}
+#spikeInfo small{font-size:24px;font-weight:800;margin-left:3px;opacity:.95}
+#touches{position:absolute;top:158px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
 #touches i{width:12px;height:12px;border-radius:3px;background:rgba(0,0,0,.35);border:2px solid #fff}
 #touches i.on{background:var(--yellow)}
 #bigMsg{position:absolute;top:24%;left:50%;transform:translateX(-50%) skewX(-8deg);font-size:46px;font-weight:900;font-style:italic;text-shadow:0 4px 0 rgba(0,0,0,.35),0 0 18px rgba(0,0,0,.35);text-align:center;pointer-events:none;letter-spacing:1px;white-space:nowrap}
@@ -357,6 +361,7 @@ body.touch #chat{width:min(290px,50vw)}
       <div class="sbScore" id="scoreA">0</div><div class="sbScore" id="scoreB">0</div>
       <div id="modeTxt"></div>
     </div>
+    <div id="spikeInfo"><div id="spikeSpd">0<small>km/h</small></div><div id="spikeHt">0<small>m</small></div></div>
     <div id="touches"><i></i><i></i><i></i></div>
     <div id="bigMsg"></div>
     <div id="serveHint" class="hidden"></div>

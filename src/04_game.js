@@ -426,7 +426,7 @@ function hitBall(type, vx, vy, g, charge = 0) {
   else { if (b.sideTeam !== P.team) { b.sideTeam = P.team; b.touches = 1; } else b.touches++; }
   if (type !== 'toss') { b.serve = false; P.serving = false; }
   b.spin = (Math.random() - 0.5) * 8 - vx * 1.5; b.landed = false; b.ds = false;
-  if (type === 'spike') { spikeRing(b.x, b.y, vx, vy, (b.pu & PU.spike) !== 0); sparkle(b.x, b.y, 14, '#ffffff', 1.3, 0.2, 0.3, 0.035, vx / 30, vy / 30); }
+  if (type === 'spike') { showSpikeInfo(vx, vy, b.y); spikeRing(b.x, b.y, vx, vy, (b.pu & PU.spike) !== 0); sparkle(b.x, b.y, 14, '#ffffff', 1.3, 0.2, 0.3, 0.035, vx / 30, vy / 30); }
   b.path = type === 'set' ? computePath(b) : null; b.pathI = 0;
   writeBall(b); hostCheckHit();
 }
@@ -587,7 +587,7 @@ function receiveBall(b, v) {
   if (b.active && !b.held) {
     const bx = b.x + b.visX, by = b.y + b.visY; const wasShown = b.scene === S.scene;
     b.x = v.x; b.y = v.y; b.vx = v.vx; b.vy = v.vy; b.acc = 0;
-    if (newHit) { spikeRing(b.x, b.y, b.vx, b.vy, (b.pu & PU.spike) !== 0); sparkle(b.x, b.y, 14, '#ffffff', 1.3, 0.2, 0.3, 0.035, b.vx / 30, b.vy / 30); }
+    if (newHit) { showSpikeInfo(b.vx, b.vy, b.y); spikeRing(b.x, b.y, b.vx, b.vy, (b.pu & PU.spike) !== 0); sparkle(b.x, b.y, 14, '#ffffff', 1.3, 0.2, 0.3, 0.035, b.vx / 30, b.vy / 30); }
     const dt = clamp((snow() - b.t) / 1000, 0, 0.6);
     if (!b.frozen && dt > 0) { let left = dt; while (left > 1e-6) { const hh = Math.min(BALL_STEP, left); simBall(b, hh); left -= hh; } }   // catch up with the same fixed-step physics everyone runs
     if (wasShown && !newHit) { const ox = bx - b.x, oy = by - b.y; if (Math.hypot(ox, oy) < 1.5) { b.visX = ox; b.visY = oy; } else { b.visX = b.visY = 0; } } else { b.visX = b.visY = 0; }
@@ -742,17 +742,25 @@ function addBubble(sid, text) { if (!sid || !text) return; let b = BUBBLES.get(s
 function sidForName(n) { for (const [sid, r] of remotes) if ((r.data && r.data.name) === n) return sid; return n === me.name ? SID : null; }
 
 /* ---------------- Camera ---------------- */
-let camKickK = 0, camShake = 0, camScrollX = 0;
+let camKickK = 0, camShake = 0, camScrollX = 0, camZoom = 0, camY = 0;
+const CAM_MIN_W = 30, CAM_MIN_H = 17;              // the closest the camera comes: about one and a half half-courts across
 function camKick(zoom, shake) { camKickK = clamp(camKickK + zoom, -0.2, 0.2); camShake = Math.min(0.6, camShake + shake * 0.03); }
 function updateCamera(dt) {
   camKickK *= Math.exp(-dt * 7); camShake *= Math.exp(-dt * 9);
   if (S.scene === 'match') {
-    const cd = courtDims(); const s = Math.min(VW / (2 * (cd.half + 1.2)), VH / 17) * (1 + camKickK * 0.25);
-    CAM.s = s; CAM.y = 0.24 * VH / s;   // the players stand three quarters of the way down, on a floor seen from a little above
-    const hw = VW / 2 / s, pad = Math.min(4, hw * 0.25); let want = 0;
-    if (P.x > hw - pad) want = P.x - (hw - pad); else if (P.x < -hw + pad) want = P.x + (hw - pad);   // semi-scrolling: the view only moves once you run off it
-    want = clamp(want, -(cd.wall - hw + 2), cd.wall - hw + 2);
-    camScrollX += (want - camScrollX) * smoothT(6, dt); CAM.x = camScrollX;
+    /* The camera sits halfway between you and the ball (equal pull), and pulls back the further apart they are.
+       It rises to follow a high ball but never drops below the floor framing; sideways it follows you everywhere. */
+    const cd = courtDims(), b = matchBall(); const live = b && b.active && !b.held;
+    const bx = live ? b.x : P.x, by = live ? b.y : P.y;
+    const needW = Math.max(CAM_MIN_W, Math.abs(bx - P.x) + 12), needH = Math.max(CAM_MIN_H, Math.abs(by - P.y) + 7);
+    const want = Math.max(Math.min(VW / needW, VH / needH), Math.min(VW / (2 * cd.wall), VH / 60));   // never further out than the whole hall
+    camZoom = camZoom ? camZoom + (want - camZoom) * smoothT(3, dt) : want;
+    const s = camZoom * (1 + camKickK * 0.25); CAM.s = s;
+    const baseY = 0.24 * VH / s;                                          // the floor framing: players three quarters of the way down
+    const wantY = Math.max(baseY, (P.y + by) / 2 + 1.5);
+    camY = camY ? camY + (wantY - camY) * smoothT(5, dt) : wantY; CAM.y = Math.max(baseY, camY);
+    const hw = VW / 2 / s; const wantX = clamp((P.x + bx) / 2, -Math.max(0, cd.wall - hw), Math.max(0, cd.wall - hw));
+    camScrollX += (wantX - camScrollX) * smoothT(6, dt); CAM.x = camScrollX;
   }
   if (camShake > 0.002) { const st = performance.now() * 0.001; shakeX = Math.sin(st * 47) * camShake * 10; shakeY = Math.sin(st * 61 + 1.7) * camShake * 10; } else { shakeX = shakeY = 0; }
 }
@@ -1368,7 +1376,17 @@ function teamLabel(t) {                            // a team goes by its captain
   if (M.bots) return botLevel.toUpperCase() + ' BOTS';
   const sid = Object.keys(M.teams[t] || {}).sort()[0]; const p = sid && M.players[sid]; return (p && p.name) || TEAM_NAME[t];
 }
+/* The spike readout: how fast the ball left the hand and how high it was hit, shown in real-volleyball units
+   (the court is drawn at about twice real size, so heights read halved; speeds read at 0.75x). */
+const REAL_M = 2.43 / NET_H, REAL_KMH = 3.6 * 0.75;
+let spikeInfoT = 0;
+function showSpikeInfo(vx, vy, y) {
+  const kmh = Math.hypot(vx, vy) * REAL_KMH, m = Math.max(0, y) * REAL_M; const [ki, kf] = kmh.toFixed(2).split('.'), [mi, mf] = m.toFixed(2).split('.');
+  $('#spikeSpd').innerHTML = `${ki}<small>.${kf} km/h</small>`; $('#spikeHt').innerHTML = `${mi}<small>.${mf} m</small>`;
+  $('#spikeInfo').classList.add('on'); spikeInfoT = T + 2.6;
+}
 function updateMatchHud() {
+  if (spikeInfoT && T > spikeInfoT) { spikeInfoT = 0; $('#spikeInfo').classList.remove('on'); }
   const M = S.match, b = matchBall(); if (!M) return;
   const setText = (sel, v) => { const el = $(sel); if (el.textContent !== String(v)) el.textContent = v; };
   setText('#scoreA', M.score.A || 0); setText('#scoreB', M.score.B || 0);
@@ -1484,7 +1502,7 @@ function botHit(bot, type, vx, vy, g = 1) {
   b.nt = null; b.brk = false; b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = bot.id; b.hitType = type; b.fx = 'none'; b.hm = bot.model; b.hitterX = bot.x; b.hitAtT = T;
   if (type === 'block') { b.touches = 0; b.sideTeam = bot.team; } else { if (b.sideTeam !== bot.team) { b.sideTeam = bot.team; b.touches = 1; } else b.touches++; }
   b.serve = false; b.spin = (Math.random() - 0.5) * 8 - vx * 1.5; b.landed = false; b.ds = false;
-  if (type === 'spike') { spikeRing(b.x, b.y, vx, vy); sparkle(b.x, b.y, 14, '#ffffff', 1.3, 0.2, 0.3, 0.035, vx / 30, vy / 30); }
+  if (type === 'spike') { showSpikeInfo(vx, vy, b.y); spikeRing(b.x, b.y, vx, vy); sparkle(b.x, b.y, 14, '#ffffff', 1.3, 0.2, 0.3, 0.035, vx / 30, vy / 30); }
   b.path = type === 'set' ? computePath(b) : null; b.pathI = 0;
   if (type === 'bump') { bot.rig.setPose('bump', T + 0.45); setTimeout(() => actionFx('bump', bot.x, bot.y, bot.f), 60); }
   else if (type === 'set') { bot.rig.setPose('set', T + 0.45); if (!bot.onGround) bot.rig.base = 'airDown'; setTimeout(() => actionFx('set', bot.x, bot.y, bot.f), 80); }
