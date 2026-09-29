@@ -2406,15 +2406,15 @@ function camKick(zoom, shake) { camKickK = clamp(camKickK + zoom, -0.2, 0.2); ca
 function updateCamera(dt) {
   camKickK *= Math.exp(-dt * 7); camShake *= Math.exp(-dt * 9);
   if (S.scene === 'match') {
-    /* The camera sits between you and the ball (you pull harder), and pulls back the further apart they are.
+    /* The camera sits between you and the ball (the ball pulls harder), and pulls back the further apart they are.
        It rises to follow a high ball but never drops below the floor framing; sideways it follows you everywhere. */
     const cd = courtDims(), b = matchBall(); const live = b && b.active && !b.held;
     let bx = live ? b.x : P.x, by = live ? b.y : P.y;
     const M = S.match;
     const server = !M || M.practice ? null : M.state === 'serve' && M.serve ? M.serve.sid : live && b.serve && b.hitType === 'toss' ? b.tossedBy : null;
     if (server) { const sv = server === SID ? P : remotes.get(server); if (sv) { bx = sv.x; by = sv.y; } }   // until the serve is struck the server pulls the camera, not the ball
-    const BP = 0.3;                                                       // the ball's pull: 30%, you 70%
-    const needW = Math.max(CAM_MIN_W, Math.abs(bx - P.x) * 0.6 + 12), needH = Math.max(CAM_MIN_H, Math.abs(by - P.y) * 0.6 + 7);
+    const BP = 0.65;                                                      // the ball's pull (or the server's, before the serve): 65%, you 35%
+    const needW = Math.max(CAM_MIN_W, Math.abs(bx - P.x) * 2 * BP + 9), needH = Math.max(CAM_MIN_H, Math.abs(by - P.y) * 2 * BP + 6);   // wide enough that you (the far one from centre) stay on screen
     const want = Math.max(Math.min(VW / needW, VH / needH), Math.min(VW / (2 * cd.wall), VH / 60));   // never further out than the whole hall
     camZoom = camZoom ? camZoom + (want - camZoom) * smoothT(3, dt) : want;
     const s = camZoom * (1 + camKickK * 0.25); CAM.s = s;
