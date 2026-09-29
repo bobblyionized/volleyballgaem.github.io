@@ -1394,21 +1394,22 @@ function teamLabel(t) {                            // a team goes by its captain
    (the court is drawn at about twice real size, so heights read halved; speeds read at 0.75x). */
 const REAL_M = 2.43 / NET_H, REAL_KMH = 3.6 * 0.75;
 let spikeInfoT = 0;
-/* Over 200 km/h a spike leaves a white streak. It grows until something happens to the ball: a touch fades it out
-   at once, the floor leaves it lying there for 3 seconds before it fades. */
-const TRAILS = [], TRAIL_KMH = 200;
-function startTrail(b) { TRAILS.push({ b, seq: b.seq, pts: [[b.x, b.y]], live: true, fadeAt: 0, fadeDur: 0 }); }
+/* Over 100 km/h a spike leaves a white streak; over 200 km/h it is black, throwing off red sparks. It grows until
+   something happens to the ball: a touch fades it out at once, the floor leaves it lying there for 3 s before it fades. */
+const TRAILS = [], TRAIL_KMH = 100, TRAIL_HOT_KMH = 200;
+function startTrail(b, hot) { TRAILS.push({ b, seq: b.seq, pts: [[b.x, b.y]], live: true, fadeAt: 0, fadeDur: 0, hot }); }
 function drawTrails() {
   for (let i = TRAILS.length - 1; i >= 0; i--) {
     const tr = TRAILS[i], b = tr.b;
     if (tr.live) {
       if (b.seq !== tr.seq || !b.active || b.held) { tr.live = false; tr.fadeAt = T; tr.fadeDur = 0.25; }       // touched: gone (quickly)
-      else { const l = tr.pts[tr.pts.length - 1]; if (Math.hypot(b.x - l[0], b.y - l[1]) > 0.25) tr.pts.push([b.x, b.y]); if (b.landed) { tr.live = false; tr.fadeAt = T + 3; tr.fadeDur = 0.6; } }   // on the floor: stays 3 s
+      else { const l = tr.pts[tr.pts.length - 1]; if (Math.hypot(b.x - l[0], b.y - l[1]) > 0.25) tr.pts.push([b.x, b.y]);
+        if (tr.hot) for (let s = 0; s < 3; s++) addPart({ kind: 'spark', x: b.x + (Math.random() - 0.5) * 0.5, y: b.y + (Math.random() - 0.5) * 0.5, vx: -b.vx * 0.08 + (Math.random() - 0.5) * 6, vy: -b.vy * 0.08 + (Math.random() - 0.5) * 6, g: 4, drag: 3, life: 0.3 + Math.random() * 0.35, size: 0.075, col: Math.random() < 0.7 ? '#ff2a2a' : '#ff8a3a' });   /* red sparks off the black streak */ if (b.landed) { tr.live = false; tr.fadeAt = T + 3; tr.fadeDur = 0.6; } }   // on the floor: stays 3 s
     }
     const k = tr.live || T < tr.fadeAt ? 1 : 1 - (T - tr.fadeAt) / tr.fadeDur; if (k <= 0) { TRAILS.splice(i, 1); continue; }
     const pts = tr.pts, n = pts.length; if (n < 2) continue;
     C.save(); C.lineCap = 'butt'; C.lineJoin = 'miter';
-    for (let j = 1; j < n; j++) { C.beginPath(); C.moveTo(pts[j - 1][0], pts[j - 1][1]); C.lineTo(pts[j][0], pts[j][1]); C.strokeStyle = `rgba(255,255,255,${(0.85 * k * (0.25 + 0.75 * j / n)).toFixed(3)})`; C.lineWidth = BALL_R * 1.5; C.stroke(); }
+    for (let j = 1; j < n; j++) { C.beginPath(); C.moveTo(pts[j - 1][0], pts[j - 1][1]); C.lineTo(pts[j][0], pts[j][1]); C.strokeStyle = `rgba(${tr.hot ? '12,10,14' : '255,255,255'},${(0.85 * k * (0.25 + 0.75 * j / n)).toFixed(3)})`; C.lineWidth = BALL_R * 1.5; C.stroke(); }
     C.restore();
   }
 }
@@ -1416,7 +1417,7 @@ function showSpikeInfo(vx, vy, y) {
   const kmh = Math.hypot(vx, vy) * REAL_KMH, m = Math.max(0, y) * REAL_M; const [ki, kf] = kmh.toFixed(2).split('.'), [mi, mf] = m.toFixed(2).split('.');
   $('#spikeSpd').innerHTML = `${ki}<small>.${kf} km/h</small>`; $('#spikeHt').innerHTML = `${mi}<small>.${mf} m</small>`;
   $('#spikeInfo').classList.add('on'); spikeInfoT = T + 2.6;
-  const b = matchBall(); if (b && kmh > TRAIL_KMH) startTrail(b);
+  const b = matchBall(); if (b && kmh > TRAIL_KMH) startTrail(b, kmh > TRAIL_HOT_KMH);
 }
 function updateMatchHud() {
   if (spikeInfoT && T > spikeInfoT) { spikeInfoT = 0; $('#spikeInfo').classList.remove('on'); }
