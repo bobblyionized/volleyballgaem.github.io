@@ -62,11 +62,28 @@ input:focus,select:focus{border-color:var(--yellow)}
 /* match hud */
 #matchHud{position:absolute;inset:0;pointer-events:none}
 #matchHud>*{pointer-events:auto}
-#score{position:absolute;top:42px;left:50%;transform:translateX(-50%) skewX(-10deg);display:flex;align-items:center;gap:14px;background:linear-gradient(90deg,#151a2e,#1f2850);border-radius:3px;padding:6px 20px;font-size:28px;font-weight:900;border:2px solid rgba(255,255,255,.2)}
-#score>*{transform:skewX(10deg)}
-#score small{font-size:10px;opacity:.7;display:block;text-align:center;font-weight:900;letter-spacing:.5px}
-#modeTxt{font-size:11px;opacity:.75;font-style:italic}
-#touches{position:absolute;top:106px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
+/* the scoreboard, Spike Cross style: a black band with the team names over their stamina, a yellow VS badge
+   with the points the set goes to, and the score under it in yellow boxes */
+#scoreboard{position:absolute;top:10px;left:50%;transform:translateX(-50%);width:min(940px,96vw);height:92px;pointer-events:none}
+.sbBand{position:absolute;top:4px;left:0;right:0;height:44px;background:linear-gradient(#24242c,#0c0c11 70%);clip-path:polygon(0 0,100% 0,calc(100% - 26px) 100%,26px 100%);box-shadow:inset 0 -3px 0 rgba(255,255,255,.08)}
+.sbSide{position:absolute;top:0;bottom:0;width:calc(50% - 64px)}
+.sbSide.A{left:0}.sbSide.B{right:0}
+.sbName{position:absolute;top:5px;font-size:16px;font-weight:900;letter-spacing:.5px;color:#fff;white-space:nowrap;max-width:80%;overflow:hidden;text-overflow:ellipsis}
+.sbSide.A .sbName{right:14px}.sbSide.B .sbName{left:14px}
+#stamina{position:absolute;inset:0}
+.stamBar{position:absolute;top:28px;height:8px;width:62%;background:rgba(255,255,255,.1);overflow:hidden}
+.sbSide.A .stamBar{right:14px}.sbSide.B .stamBar{left:14px}
+.stamBar i,.stamBar b{position:absolute;top:0;bottom:0}
+.stamBar i{background:#fff}
+.stamBar b{background:#ffd21f;transition:width .45s ease-in}
+#stamA i,#stamA b{right:0}#stamB i,#stamB b{left:0}
+.sbHex{position:absolute;left:50%;top:0;width:112px;height:70px;transform:translateX(-50%);clip-path:polygon(24% 0,76% 0,100% 50%,76% 100%,24% 100%,0 50%);background:linear-gradient(#fff27a,#ffd21f 45%,#e0a800);display:flex;flex-direction:column;align-items:center;justify-content:center;color:#2a1d00;filter:drop-shadow(0 3px 0 rgba(0,0,0,.35))}
+.sbHex small{font-size:14px;font-weight:900;line-height:1;opacity:.75}
+.sbHex span{font-size:30px;font-weight:900;font-style:italic;line-height:1;letter-spacing:-1px}
+.sbScore{position:absolute;top:50px;width:62px;height:26px;background:linear-gradient(#ffe85a,#ffc800);color:#231800;font-size:21px;font-weight:900;display:flex;align-items:center;justify-content:center;clip-path:polygon(12% 0,100% 0,88% 100%,0 100%)}
+#scoreA{right:calc(50% + 40px)}#scoreB{left:calc(50% + 40px);clip-path:polygon(0 0,88% 0,100% 100%,12% 100%)}
+#modeTxt{position:absolute;top:80px;left:50%;transform:translateX(-50%);font-size:11px;opacity:.75;font-style:italic;font-weight:800;white-space:nowrap}
+#touches{position:absolute;top:104px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
 #touches i{width:12px;height:12px;border-radius:3px;background:rgba(0,0,0,.35);border:2px solid #fff}
 #touches i.on{background:var(--yellow)}
 #bigMsg{position:absolute;top:24%;left:50%;transform:translateX(-50%) skewX(-8deg);font-size:46px;font-weight:900;font-style:italic;text-shadow:0 4px 0 rgba(0,0,0,.35),0 0 18px rgba(0,0,0,.35);text-align:center;pointer-events:none;letter-spacing:1px;white-space:nowrap}
@@ -264,11 +281,6 @@ body.touch #chat{width:min(290px,50vw)}
 #openDone.ready{pointer-events:auto}
 @media (max-width:900px){.mBody{width:100%}#menu:before{background:rgba(9,14,34,.95)}#menuClose{margin-right:0}.mNav{width:132px}.mNav button{font-size:13px;padding:11px 10px}#modeCards{grid-template-columns:repeat(2,1fr)}.cols{grid-template-columns:1fr}#invDetail{width:160px}}
 
-/* stamina: one bar per team, both teams see both (Spike Cross style) */
-#stamina{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:min(820px,96vw);display:flex;justify-content:space-between;pointer-events:none}
-.stamBar{width:min(260px,28vw);position:relative;height:12px;background:rgba(10,14,34,.55);transform:skewX(-14deg);overflow:hidden}
-.stamBar i{position:absolute;left:0;top:0;bottom:0;background:#ffffff;transition:width .25s}
-#stamB i{left:auto;right:0}
 /* breakthroughs */
 .btcard{--rc:#9aa0a6;position:relative;border:3px solid var(--rc);background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(0,0,0,.35));padding:10px;display:flex;flex-direction:column;gap:6px;text-align:center;color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.35)}
 .btcard .bl{font-size:44px;font-weight:900;font-style:italic;color:var(--rc);line-height:1;text-shadow:0 0 14px var(--rc)}
@@ -336,8 +348,15 @@ body.touch #chat{width:min(290px,50vw)}
 
   <div id="matchHud" class="hidden">
     <button class="btn red small" id="leaveBtn">LEAVE MATCH</button>
-    <div id="stamina"><div id="stamA" class="stamBar"><i></i></div><div id="stamB" class="stamBar"><i></i></div></div>
-    <div id="score"><div><span id="scoreA">0</span><small>BLACK</small></div><div>-</div><div><span id="scoreB">0</span><small>WHITE</small></div><div id="modeTxt"></div></div>
+    <div id="scoreboard">
+      <div class="sbBand"><div id="stamina">
+        <div class="sbSide A"><div class="sbName" id="nameA">BLACK</div><div id="stamA" class="stamBar"><b></b><i></i></div></div>
+        <div class="sbSide B"><div class="sbName" id="nameB">WHITE</div><div id="stamB" class="stamBar"><b></b><i></i></div></div>
+      </div></div>
+      <div class="sbHex"><small id="sbTo">25</small><span>VS</span></div>
+      <div class="sbScore" id="scoreA">0</div><div class="sbScore" id="scoreB">0</div>
+      <div id="modeTxt"></div>
+    </div>
     <div id="touches"><i></i><i></i><i></i></div>
     <div id="bigMsg"></div>
     <div id="serveHint" class="hidden"></div>

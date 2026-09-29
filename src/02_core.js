@@ -98,20 +98,20 @@ const me = { sid: SID, id: SID, name: 'Guest', guest: true, dollars: 0, friends:
    jump set) and climb onto / drop off the stairs. Escape always closes the menu on top of whatever it is bound to. */
 const KEY_DEFAULTS = {
   moveL: 'KeyA', moveR: 'KeyD',
-  block: 'KeyQ', bump: 'KeyQ', dive: 'ControlLeft', jumpSet: 'KeyE',
-  groundSet: 'Mouse0', spike: 'Mouse0', toss: 'Mouse0', spawnBall: 'KeyG', serve: 'Digit1', jump: 'Space', emote: 'KeyB',
+  block: 'KeyQ', bump: 'Space', dive: 'ControlLeft', jumpSet: 'KeyE',
+  groundSet: 'Mouse0', spike: 'Space', toss: 'Mouse0', spawnBall: 'KeyG', serve: 'Digit1', jump: 'KeyW', emote: 'KeyB',
   chat: 'Slash', menu: 'KeyM'
 };
 // mirrored to the right of the keyboard, for players who hold the mouse in their left hand
 const KEY_LEFTY = {
   moveL: 'ArrowLeft', moveR: 'ArrowRight',
-  block: 'KeyP', bump: 'KeyP', dive: 'ControlRight', jumpSet: 'KeyO',
-  groundSet: 'Mouse0', spike: 'Mouse0', toss: 'Mouse0', spawnBall: 'KeyL', serve: 'Digit0', jump: 'Space', emote: 'Semicolon',
+  block: 'KeyP', bump: 'ShiftRight', dive: 'ControlRight', jumpSet: 'KeyO',
+  groundSet: 'Mouse0', spike: 'ShiftRight', toss: 'Mouse0', spawnBall: 'KeyL', serve: 'Digit0', jump: 'ArrowUp', emote: 'Semicolon',
   chat: 'Slash', menu: 'KeyM'
 };
 const KEY_LABELS = {
   moveL: 'Run Left', moveR: 'Run Right',
-  block: 'Block', bump: 'Bump', dive: 'Dive', jumpSet: 'Jump Set', groundSet: 'Ground Set',
+  block: 'Block', bump: 'Bump (hold)', dive: 'Dive', jumpSet: 'Jump Set', groundSet: 'Ground Set',
   spike: 'Spike', toss: 'Toss / Serve toss', spawnBall: 'Spawn Ball (practice)', serve: 'Serve (practice)', jump: 'Jump', emote: 'Emote Wheel',
   chat: 'Chat', menu: 'Menu'
 };
@@ -121,7 +121,7 @@ const KEY_GROUPS = [
   ['Interface', ['menu', 'emote', 'chat']]
 ];
 let KEYS = Object.assign({}, KEY_DEFAULTS);
-try { const s = JSON.parse(localStorage.getItem('vg_keys2d') || 'null'); if (s) { for (const k in s) if (!(k in KEY_DEFAULTS)) delete s[k]; KEYS = Object.assign({}, KEY_DEFAULTS, s); } } catch (e) { }
+try { const s = JSON.parse(localStorage.getItem('vg_keys2d3') || 'null'); if (s) { for (const k in s) if (!(k in KEY_DEFAULTS)) delete s[k]; KEYS = Object.assign({}, KEY_DEFAULTS, s); } } catch (e) { }
 const BOUND = new Set();                     // every code currently in use, so the browser's own shortcut can be suppressed
 function keyName(code) {
   if (!code) return '-';
@@ -167,11 +167,11 @@ function setBind(code) {
   if (!rebinding) return;
   if (code === 'Escape' && rebinding !== 'menu') { rebinding = null; renderKeys(); return; }
   KEYS[rebinding] = code; rebinding = null;
-  try { localStorage.setItem('vg_keys2d', JSON.stringify(KEYS)); } catch (e) { }
+  try { localStorage.setItem('vg_keys2d3', JSON.stringify(KEYS)); } catch (e) { }
   applyKeys(); renderKeys();
 }
-function usePreset(preset, msg) { KEYS = Object.assign({}, preset); try { localStorage.setItem('vg_keys2d', JSON.stringify(KEYS)); } catch (e) { } applyKeys(); renderKeys(); toast(msg); }
-$('#kbReset').onclick = () => { try { localStorage.removeItem('vg_keys2d'); } catch (e) { } usePreset(KEY_DEFAULTS, 'Default layout'); };
+function usePreset(preset, msg) { KEYS = Object.assign({}, preset); try { localStorage.setItem('vg_keys2d3', JSON.stringify(KEYS)); } catch (e) { } applyKeys(); renderKeys(); toast(msg); }
+$('#kbReset').onclick = () => { try { localStorage.removeItem('vg_keys2d3'); } catch (e) { } usePreset(KEY_DEFAULTS, 'Default layout'); };
 $('#kbLefty').onclick = () => usePreset(KEY_LEFTY, 'Left-handed layout');
 applyKeys();
 

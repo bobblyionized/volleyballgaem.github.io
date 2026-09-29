@@ -3,8 +3,8 @@
    ===================================================================== */
 const G = 20;                                      // player gravity (the athletes are 1.5x bigger and jump over a net twice as high)
 const MOVE_SPEED = 6.5, GROUND_CD = 0.7, DIVE_CD = 0.3;
-const JUMP_H50 = 4.4;                              // jump height at Jump 50, in metres
-const REACH_G = 1.9 * PS, REACH_A = 1.8 * PS;
+const JUMP_H50 = 4.8;                              // jump height at Jump 50, in metres
+const REACH_G = 1.9 * HB, REACH_A = 1.8 * HB;
 const BODY_H = 1.9 * PS, HALF_W = 0.28 * PS, NET_GAP = 0.45 * PS;
 const TEAM_VARIANT = { A: 'black', B: 'white', L: 'white' };
 const SET_TOP = () => NET_H * 2.5;                 // no set climbs higher than 2.5 nets
@@ -79,7 +79,7 @@ function makeBall(id, sceneName, skin = 'default') {
 function removeBall(id) { const b = balls.get(id); if (!b) return; balls.delete(id); if (B === b) B = null; }
 function acrossNet(ax, bx) { for (const n of netsFor()) if ((ax - n.x) * (bx - n.x) < 0) return true; return false; }
 function blockReach() {                          // the block hitbox: a column from your feet to the top of your hands, leaning with you
-  const hx = P.x + P.f * (0.3 + P.blockLean * 0.9) * PS, top = P.y + 2.25 * PS + 0.75 * PS, hw = 0.7 * PS; let best = null, bd = 1e9;
+  const hx = P.x + P.f * (0.3 + P.blockLean * 0.9) * PS, top = P.y + 2.25 * PS + 0.85 * HB, hw = 0.7 * HB; let best = null, bd = 1e9;
   for (const b of balls.values()) {
     if (b.scene !== S.scene || !b.active || b.held || b.frozen || b.hitter === SID) continue;
     if (b.y < P.y - BALL_R || b.y > top + BALL_R) continue;
@@ -191,14 +191,17 @@ function receiveBreak(team = P.team) {           // 0% stamina: the pass breaks 
   hitBall('bump', away * Math.cos(pitch) * sp * k, Math.sin(pitch) * sp * k + 3, 1); b.brk = true; showBallMsg('RECEIVE BREAK', b); camKick(0.05, 5);
   return true;
 }
-function doBump() { P.rig.setPose('bump', T + 0.5); P.cd = GROUND_CD; P.act = { type: 'bump', until: T + ACT_WINDOW }; setTimeout(() => actionFx('bump', P.x, P.y, P.f, myPurple('set')), 60); tryAct(); }
+/* Bump is held: platform up for as long as the key is down, and any ball that drops onto it is passed to the cursor. */
+function doBump() { P.bumpHold = true; P.rig.setPose('bump'); P.act = { type: 'bump', until: 1e9 }; tryAct(); }
+function endBump() { P.bumpHold = false; if (P.act && P.act.type === 'bump') P.act = null; if (P.rig.anim === 'bump') P.rig.setPose(P.rig.base); P.cd = Math.max(P.cd, 0.12); }
 function doGroundSet() { P.rig.setPose('set', T + 0.45); P.cd = GROUND_CD; P.act = { type: 'set', until: T + ACT_WINDOW }; setTimeout(() => actionFx('set', P.x, P.y, P.f, myPurple('set')), 80); tryAct(); }
 function doJumpSet() { P.airUsed = true; P.airActed = true; P.rig.base = 'airDown'; P.rig.setPose('set', T + 0.45); P.act = { type: 'jset', until: T + ACT_WINDOW }; setTimeout(() => actionFx('set', P.x, P.y, P.f, myPurple('set')), 80); tryAct(); }
 function tryAct() {
   const a = P.act; if (!a) return;
   if (T > a.until) { P.act = null; return; }
   if (a.type === 'bump') {
-    if (!ballReach(chestX(), chestY(), REACH_G, 0.55)) return; P.act = null;
+    if (T < (a.from || 0) || !ballReach(chestX(), chestY(), REACH_G, 0.55)) return;
+    P.act = P.bumpHold ? { type: 'bump', until: 1e9, from: T + 0.35 } : null; actionFx('bump', P.x, P.y, P.f, myPurple('set'));
     if (receiveBreak()) return; const st = payForPass(B, 'bump'); bumpToCursor(st);
   } else if (a.type === 'set') {
     if (!ballReach(chestX(), chestY() + 0.55 * PS, REACH_G, 0.5)) return; P.act = null; if (receiveBreak()) return; setToCursor(payForPass(B, 'set'));
@@ -415,6 +418,7 @@ function updatePlayer(dt) {
   const ui = !$('#openFx').classList.contains('hidden');
   const { ix } = ui || isTyping() ? { ix: 0 } : inputAxes();
   if (P.cd > 0) P.cd -= dt;
+  if (P.bumpHold && (!keys.has(KEYS.bump) || !P.onGround || P.dive || P.holding)) endBump();
   const steering = !!(P.holding && P.serveAim !== null);
   tryAct(); updateBlockLean();
   if (P.swingAt && T >= P.swingAt) { P.swingAt = 0; if (!P.onGround) { P.rig.base = 'airDown'; P.rig.setPose('spikeHit', T + 0.4); actionFx('spike', P.x, P.y, P.f); } }
@@ -426,7 +430,7 @@ function updatePlayer(dt) {
   } else if (P.onGround) {
     if (P.emote && ix) stopEmote();
     const mv = steering || P.emote ? 0 : ix;
-    if (mv) { P.vx = mv * MOVE_SPEED * speedMult(stat('speed')) * (inRealMatch() ? staminaSpeed(teamStamina(P.team)) : 1); P.moveDir = Math.sign(mv); P.moving = true; }
+    if (mv) { P.vx = mv * MOVE_SPEED * speedMult(stat('speed')) * (inRealMatch() ? staminaSpeed(teamStamina(P.team)) : 1) * (P.bumpHold ? 0.55 : 1); P.moveDir = Math.sign(mv); P.moving = true; }
     else { P.vx = 0; P.moving = false; }
   } else if (ix && !steering) {                                             // in the air you can still steer, a little slower than you run
     const air = ix * MOVE_SPEED * speedMult(stat('speed')) * 0.8; P.vx += (air - P.vx) * smoothT(7, dt);
@@ -541,7 +545,7 @@ function updateBalls(dt) {
     if (b.skin === 'fire' && !ULTRA && Math.hypot(b.vx, b.vy) > 3 && Math.random() < 0.6) addPart({ kind: 'dot', x: b.x, y: b.y, vx: -b.vx * 0.1, vy: 0.6, g: -1, drag: 2, life: 0.35, size: 0.1, col: Math.random() < 0.5 ? '#ffb02a' : '#ff5a1f' });
   }
   if (T < P.blockUntil && !P.onGround && blockReach() && B.hitter !== SID && B.vx * blockNetDir() < 0 && Math.abs(B.x) < NET_GAP + 3.2) blockContact();   // blocks reach over the net and lean with you
-  if (P.dive && !P.dive.hit && ballReach(P.x + P.dive.dir * 1.0 * PS, P.y + 0.6 * PS, 1.8 * PS)) diveContact();
+  if (P.dive && !P.dive.hit && ballReach(P.x + P.dive.dir * 1.0 * PS, P.y + 0.6 * PS, 1.8 * HB)) diveContact();
 }
 /* ---- "TOO LOW" popup at the ball ---- */
 let ballMsg = null;
@@ -725,8 +729,8 @@ function camKick(zoom, shake) { camKickK = clamp(camKickK + zoom, -0.2, 0.2); ca
 function updateCamera(dt) {
   camKickK *= Math.exp(-dt * 7); camShake *= Math.exp(-dt * 9);
   if (S.scene === 'match') {
-    const cd = courtDims(); const s = Math.min(VW / (2 * (cd.half + 3.5)), VH / 19) * (1 + camKickK * 0.25);
-    CAM.s = s; CAM.y = 0.31 * VH / s;   // the floor band keeps the bottom fifth of the screen, under the action cards
+    const cd = courtDims(); const s = Math.min(VW / (2 * (cd.half + 1.2)), VH / 17) * (1 + camKickK * 0.25);
+    CAM.s = s; CAM.y = 0.24 * VH / s;   // the players stand three quarters of the way down, on a floor seen from a little above
     const hw = VW / 2 / s, pad = Math.min(4, hw * 0.25); let want = 0;
     if (P.x > hw - pad) want = P.x - (hw - pad); else if (P.x < -hw + pad) want = P.x + (hw - pad);   // semi-scrolling: the view only moves once you run off it
     want = clamp(want, -(cd.wall - hw + 2), cd.wall - hw + 2);
@@ -737,7 +741,7 @@ function updateCamera(dt) {
 
 /* ---------------- Action cards ---------------- */
 const CARD_SETS = {
-  ground: [['bump', 'BUMP', 'bump'], ['groundSet', 'SET', 'set'], ['dive', 'DIVE', 'dive']],
+  ground: [['bump', 'BUMP', 'bump', true], ['groundSet', 'SET', 'set'], ['dive', 'DIVE', 'dive']],
   air: [['block', 'BLOCK', 'block'], ['jumpSet', 'JUMP SET', 'set'], ['spike', 'SPIKE', 'spikeHit', true]],
   hold: [['toss', 'TOSS', 'toss']],
 };
@@ -1263,7 +1267,7 @@ function resetToSpawn() {                       // back to your starting spot (m
   const M = S.match; if (!M) return;
   const mates = Object.keys(M.teams[P.team] || {}).sort(); const idx = Math.max(0, mates.indexOf(SID));
   P.x = M.practice ? -4 : spawnX(P.team, idx, mates.length); P.y = 0; P.vx = P.vy = 0; P.onGround = true; P.f = P.team === 'A' ? 1 : -1;
-  P.holding = false; P.serveMode = false; P.serveAim = null; P.dive = null; P.dash = null; P.glide = null; P.charging = false; P.airUsed = false; P.act = null; P.swingAt = 0; P.onStairs = false;
+  P.holding = false; P.serveMode = false; P.serveAim = null; P.dive = null; P.dash = null; P.glide = null; P.charging = false; P.airUsed = false; P.act = null; P.bumpHold = false; P.swingAt = 0; P.onStairs = false;
   if (P.rig) { P.rig.base = 'idle'; P.rig.setPose('idle'); P.rig.pitchTarget = 0; }
 }
 async function enterMatch(mid) {
@@ -1339,12 +1343,25 @@ function leaveMatch() {
   document.body.classList.remove('inMatch'); openMenu('play');
 }
 $('#leaveBtn').onclick = () => leaveMatch();
+const STAM_TRAIL = { A: { v: 1, at: 0 }, B: { v: 1, at: 0 } };
+function teamLabel(t) {                            // a team goes by its captain: you on your side, the first player (or the bots) on the other
+  const M = S.match; if (!M) return TEAM_NAME[t];
+  if (P.team === t && !M.practice) return me.name || TEAM_NAME[t];
+  if (M.bots) return botLevel.toUpperCase() + ' BOTS';
+  const sid = Object.keys(M.teams[t] || {}).sort()[0]; const p = sid && M.players[sid]; return (p && p.name) || TEAM_NAME[t];
+}
 function updateMatchHud() {
   const M = S.match, b = matchBall(); if (!M) return;
   const setText = (sel, v) => { const el = $(sel); if (el.textContent !== String(v)) el.textContent = v; };
   setText('#scoreA', M.score.A || 0); setText('#scoreB', M.score.B || 0);
-  $('#stamina').classList.toggle('hidden', !!M.practice);
-  if (!M.practice) for (const t of ['A', 'B']) $('#stam' + t + ' i').style.width = (teamStamina(t) * 100).toFixed(1) + '%';
+  $('#stamina').classList.toggle('hidden', !!M.practice); setText('#sbTo', WIN_SCORE);
+  for (const t of ['A', 'B']) setText('#name' + t, teamLabel(t));
+  /* white = what is left; yellow = what was just spent, catching up a moment later */
+  if (!M.practice) for (const t of ['A', 'B']) {
+    const v = teamStamina(t), tr = STAM_TRAIL[t];
+    if (v >= tr.v) { tr.v = v; tr.at = 0; } else if (!tr.at) tr.at = T + 0.55; else if (T > tr.at) { tr.v = v; tr.at = 0; }
+    $('#stam' + t + ' i').style.width = (v * 100).toFixed(1) + '%'; $('#stam' + t + ' b').style.width = (tr.v * 100).toFixed(1) + '%';
+  }
   $$('#touches i').forEach((el, i) => { const on = !!b && i < b.touches && b.active; if (el.classList.contains('on') !== on) el.classList.toggle('on', on); });
   setText('#bigMsg', M.msg || '');
   const sh = $('#serveHint'); let hint = '';
@@ -1371,7 +1388,7 @@ function updateMatchHud() {
    ===================================================================== */
 const BOTS = [];
 const BOT_NAMES = [['Bob', 'boy'], ['Greg', 'boy'], ['Emily', 'boy'], ['Dave', 'boy'], ['Sarah', 'boy'], ['Karen', 'boy'], ['Steve', 'boy'], ['Linda', 'boy'], ['Kevin', 'boy'], ['Jenny', 'boy'], ['Frank', 'boy'], ['Nancy', 'boy']];
-const BOT_REACH_G = 1.85 * PS, BOT_REACH_A = 1.7 * PS;
+const BOT_REACH_G = 1.85 * HB, BOT_REACH_A = 1.7 * HB;
 let botLevel = 'easy';
 const BOT_LEVELS = { easy: 40, medium: 50, hard: 50 }, BOT_BLOCK_MISS = { easy: 0.45, medium: 0.3, hard: 0.18 };
 function botStats() {                              // easy: 40 everywhere, medium: 50 everywhere, hard: 100 spike, set and jump, 50 the rest
@@ -1436,7 +1453,7 @@ function botDigs() {                               // a diving bot scoops up the
   const b = matchBall(); if (!b || !b.active) return;
   for (const bot of BOTS) {
     const d = bot.dive; if (!d || d.hit || !botMayTouch(bot)) continue;
-    if (Math.hypot(b.x - (bot.x + d.dir * 1.0 * PS), b.y - (bot.y + 0.6 * PS)) > 1.8 * PS) continue;
+    if (Math.hypot(b.x - (bot.x + d.dir * 1.0 * PS), b.y - (bot.y + 0.6 * PS)) > 1.8 * HB) continue;
     d.hit = true; const team = bot.team;
     if (teamStamina(team) <= 0.001 && (b.sideTeam !== team || b.touches === 0)) { const sp = Math.hypot(b.vx, b.vy), k = 0.22 + Math.random() * 0.13, pitch = (30 + Math.random() * 25) * D; botHit(bot, 'dive', -teamSide(team) * -Math.cos(pitch) * sp * k, Math.sin(pitch) * sp * k + 3, 1); b.brk = true; showBallMsg('RECEIVE BREAK', b); continue; }
     payForPass(b, 'dive', team, bot.st.set); const v = launchTo(b.x, b.y, setterSpot(team), 0, Math.min(courtDims().ceil - 1, Math.max(11, b.y + 6)), BALL_G * 0.7); botHit(bot, 'dive', v.x, v.y, 0.7);
@@ -1620,7 +1637,7 @@ function botBlockContacts() {
   for (const bot of BOTS) {
     const s = teamSide(bot.team);
     if (bot.onGround || T >= bot.blockUntil || bot.blockMiss || b.hitter === bot.id || b.vx * s <= 0 || b.x * s > 0.9 || b.x * s < -1.3) continue;
-    const top = bot.y + 3.0 * PS; if (b.y < bot.y - BALL_R || b.y > top + BALL_R) continue; const t = clamp((b.y - bot.y) / (top - bot.y), 0, 1); if (Math.abs(b.x - (bot.x + bot.f * 0.3 * PS * t)) > 0.7 * PS + BALL_R) continue;   // feet to hands, like a player's block
+    const top = bot.y + 2.25 * PS + 0.85 * HB; if (b.y < bot.y - BALL_R || b.y > top + BALL_R) continue; const t = clamp((b.y - bot.y) / (top - bot.y), 0, 1); if (Math.abs(b.x - (bot.x + bot.f * 0.3 * PS * t)) > 0.7 * HB + BALL_R) continue;   // feet to hands, like a player's block
     const r = blockTouch(b, bot.x, bot.y, bot.f, -s, (bot.blockTilt || -1) * 0.3, bot.st.block);   // the same block a player makes
     botHit(bot, 'block', r.vx, r.vy, r.g); if (r.kind) showBallMsg(r.kind, b);
   }
@@ -1673,6 +1690,9 @@ function render(dt) {
   worldTf();
   drawFx('back');
   for (const n of netsFor()) if (onScreen(n.x - 1, n.x + 1)) n.draw(T);
+  const shadow = (x, y) => ellipse(x, 0.02, 0.55 * PS * clamp(1 - y * 0.08, 0.4, 1), 0.13, 0, `rgba(0,0,0,${clamp(0.22 - y * 0.02, 0.05, 0.22).toFixed(3)})`);
+  for (const r of remotes.values()) if (onScreen(r.x - 2, r.x + 2)) shadow(r.x, r.y);
+  shadow(P.x, P.y);
   for (const r of remotes.values()) if (onScreen(r.x - 2, r.x + 2)) r.rig.draw();
   P.rig.draw();
   for (const b of balls.values()) {                // the dotted path of the last set, from where the ball is now

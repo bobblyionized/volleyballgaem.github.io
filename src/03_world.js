@@ -94,8 +94,9 @@ updateDayNight(); setInterval(updateDayNight, 15000);
    character faces. Arms hang from the torso and legs from the pelvis, so leaning the body forward swings
    the limbs back with it. The near arm (R) is the hitting arm.
    ===================================================================== */
-const PS = 1.5;                                    // player scale: the athletes are 1.5x the old size (hitboxes included)
-const RIG = { hipY: 0.95, torso: 0.56, upArm: 0.31, foreArm: 0.29, thigh: 0.47, shin: 0.47, headR: 0.14 };
+const PS = 1.1;                                    // player scale: slim Spike Cross athletes, small against the court
+const HB = 1.5;                                    // hitbox scale: how far you can reach for a ball stays what it was
+const RIG = { hipY: 1.0, torso: 0.54, upArm: 0.33, foreArm: 0.31, thigh: 0.5, shin: 0.5, headR: 0.13 };   // long legs, small head
 const JOINTS = ['spine', 'neck', 'shL', 'elL', 'shR', 'elR', 'hipL', 'knL', 'hipR', 'knR'];
 const P2 = (spine, neck, shL, elL, shR, elR, hipL, knL, hipR, knR) => ({ spine, neck, shL, elL, shR, elR, hipL, knL, hipR, knR });
 const POSES = {
@@ -119,11 +120,11 @@ const POSES = {
   toss:        P2(-4, -16, 160, 0, 15, 6, 0, 0, 0, 0),
 };
 const POSE_SNAP = { jumpUp: 22, land: 20, spikeCharge: 26, spikeHit: 32, bump: 20 };
-const JERSEY2 = { black: { shirt: '#26272e', trim: '#e9e9ee', shorts: '#1d1e24', num: '#ffffff' }, white: { shirt: '#e3e5ea', trim: '#2b2d35', shorts: '#cfd2d9', num: '#2b2d35' } };
+const JERSEY2 = { black: { shirt: '#1d1e25', trim: '#e5484d', shorts: '#15161b', num: '#ffffff', pad: '#d9383f', sock: '#1d1e25' }, white: { shirt: '#eef0f4', trim: '#2b5fd9', shorts: '#e3e6ec', num: '#2b2d35', pad: '#2b2d35', sock: '#f7f7f7' } };
 const HAIRS = [['#f1d27a', '#2a5fe0'], ['#e8843a', '#b85a1c'], ['#3a2a22', '#241812'], ['#dfe3ea', '#9aa3b2'], ['#1c1c24', '#35354a'], ['#c9924a', '#8a5a2a'], ['#f1d27a', '#d9a93a']];
 function lookFor(variant, model, hairIdx = 0) {
   const j = JERSEY2[variant] || JERSEY2.white; const h = HAIRS[hairIdx % HAIRS.length];
-  return { skin: '#f1c9a5', hair: h[0], hairTip: h[1], shirt: j.shirt, trim: j.trim, shorts: j.shorts, num: j.num, pad: '#303138', sock: '#f7f7f7', shoe: '#f4f4f4', shoeStripe: variant === 'black' ? '#e5484d' : '#3a6fd8', eye: '#1c1f30', size: [PS, PS] };
+  return { skin: '#f1c9a5', hair: h[0], hairTip: h[1], shirt: j.shirt, trim: j.trim, shorts: j.shorts, num: j.num, pad: j.pad, sock: j.sock, shoe: '#f4f4f4', shoeStripe: variant === 'black' ? '#e5484d' : '#3a6fd8', eye: '#1c1f30', size: [PS, PS] };
 }
 function spring1(o, k, tg, w, dt) { const e = Math.exp(-w * dt); const x = o.c[k] - tg; const tmp = (o.v[k] + w * x) * dt; o.c[k] = tg + (x + tmp) * e; o.v[k] = (o.v[k] - w * tmp) * e; }
 const INK = '#221f29';
@@ -207,37 +208,38 @@ class Rig2D {
   }
   bone(A, B, w, col, t0 = 0, t1 = 1) {             // a limb segment (or part of one) with a thin ink outline, square-ended
     const ax = A[0] + (B[0] - A[0]) * t0, ay = A[1] + (B[1] - A[1]) * t0, bx = A[0] + (B[0] - A[0]) * t1, by = A[1] + (B[1] - A[1]) * t1;
-    C.beginPath(); C.moveTo(ax, ay); C.lineTo(bx, by); C.strokeStyle = INK; C.lineWidth = w + 0.03; C.stroke();
+    C.beginPath(); C.moveTo(ax, ay); C.lineTo(bx, by); C.strokeStyle = INK; C.lineWidth = w + 0.022; C.stroke();
     C.beginPath(); C.moveTo(ax, ay); C.lineTo(bx, by); C.strokeStyle = col; C.lineWidth = w; C.stroke();
   }
   chain(P0, P1, P2, w, col) {                      // two segments as one polyline: a sharp elbow / knee instead of a round cap
-    for (const [lw, c] of [[w + 0.03, INK], [w, col]]) { C.beginPath(); C.moveTo(P0[0], P0[1]); C.lineTo(P1[0], P1[1]); C.lineTo(P2[0], P2[1]); C.strokeStyle = c; C.lineWidth = lw; C.stroke(); }
+    for (const [lw, c] of [[w + 0.022, INK], [w, col]]) { C.beginPath(); C.moveTo(P0[0], P0[1]); C.lineTo(P1[0], P1[1]); C.lineTo(P2[0], P2[1]); C.strokeStyle = c; C.lineWidth = lw; C.stroke(); }
   }
   limbArm(A, L, isFar) {
     const k = isFar ? far2 : same; const sh = this.sk.sh;
     const dx = A.W[0] - A.E[0], dy = A.W[1] - A.E[1], dl = Math.hypot(dx, dy) || 1; const Hd = [A.W[0] + dx / dl * 0.08, A.W[1] + dy / dl * 0.08];
-    this.chain(sh, A.E, A.W, 0.078, k(L.skin));
-    this.bone(A.W, Hd, 0.07, k(L.skin), -0.1, 1);                                              // hand: a short blunt block
-    this.bone(sh, A.E, 0.118, k(L.shirt), 0, 0.5);                                             // short sleeve
+    this.chain(sh, A.E, A.W, 0.06, k(L.skin));
+    this.bone(A.W, Hd, 0.058, k(L.skin), -0.1, 1);                                             // hand: a short blunt block
+    this.bone(sh, A.E, 0.092, k(L.shirt), 0, 0.46);                                            // short sleeve
+    this.bone(sh, A.E, 0.094, k(L.trim), 0.4, 0.47);                                           // sleeve cuff
   }
   limbLeg(G, L, isFar) {
     const k = isFar ? far2 : same; const H = this.sk.H;
-    this.chain(H, G.K, G.F, 0.105, k(L.skin));
-    this.bone(H, G.K, 0.158, k(L.shorts), 0, 0.46);                                            // shorts leg
-    this.bone(G.K, G.F, 0.112, k(L.sock), 0.58, 0.97);                                         // sock
-    this.bone(G.K, G.F, 0.14, k(L.pad), -0.06, 0.2);                                           // knee pad
+    this.chain(H, G.K, G.F, 0.08, k(L.skin));
+    this.bone(H, G.K, 0.13, k(L.shorts), 0, 0.42);                                             // shorts leg
+    this.bone(G.K, G.F, 0.086, k(L.sock), 0.5, 0.97);                                          // long sock
+    this.bone(G.K, G.F, 0.105, k(L.pad), -0.07, 0.18);                                         // knee pad
     const fx = Math.cos(G.k), fy = Math.sin(G.k);
     C.save(); C.translate(G.F[0] + fx * 0.075, G.F[1] + fy * 0.075 - 0.02); C.rotate(G.k);
-    poly([-0.12, -0.05, 0.13, -0.05, 0.15, -0.01, 0.1, 0.045, -0.12, 0.045], k(L.shoe), INK, 0.018);
+    C.scale(0.85, 0.85); poly([-0.12, -0.05, 0.13, -0.05, 0.15, -0.01, 0.1, 0.045, -0.12, 0.045], k(L.shoe), INK, 0.018);
     line(-0.12, -0.04, 0.14, -0.04, k('#3a3b44'), 0.022, 'butt'); line(-0.05, 0.005, 0.05, 0.005, k(L.shoeStripe), 0.024, 'butt');
     C.restore();
   }
   torso(L) {
     const sk = this.sk; C.save(); C.translate(sk.H[0], sk.H[1]); C.rotate(-sk.s);
     const T = RIG.torso;
-    poly([-0.15, -0.05, 0.14, -0.05, 0.16, 0.11, -0.16, 0.11], L.shorts, INK, 0.02);                            // waistband / shorts
-    poly([-0.155, 0.04, 0.15, 0.04, 0.17, T * 0.62, 0.13, T - 0.02, 0.05, T + 0.03, -0.1, T + 0.02, -0.17, T - 0.06, -0.165, T * 0.5], L.shirt, INK, 0.022);   // jersey
-    line(-0.03, 0.08, -0.05, T - 0.04, L.trim, 0.025, 'butt');                                                   // side seam stripe
+    poly([-0.115, -0.06, 0.115, -0.06, 0.125, 0.1, -0.125, 0.1], L.shorts, INK, 0.018);                        // waistband / shorts
+    poly([-0.12, 0.04, 0.115, 0.04, 0.15, T * 0.62, 0.12, T - 0.02, 0.05, T + 0.03, -0.1, T + 0.02, -0.15, T - 0.06, -0.14, T * 0.5], L.shirt, INK, 0.018);   // jersey: narrow waist, wider shoulders
+    line(-0.02, 0.06, -0.06, T - 0.04, L.trim, 0.03, 'butt'); line(-0.12, 0.06, 0.115, 0.06, L.trim, 0.022, 'butt');   // side stripe and hem
     C.save(); C.translate(0.05, T * 0.48); C.scale(0.01, -0.01); C.font = '900 20px Montserrat, Arial'; C.textAlign = 'center'; C.textBaseline = 'middle'; C.fillStyle = L.num; C.fillText('1', 0, 0); C.restore();
     line(0.02, T + 0.02, 0.12, T - 0.01, L.trim, 0.025);                                                        // collar
     C.restore();
@@ -245,7 +247,7 @@ class Rig2D {
   head(L) {
     const sk = this.sk; C.save();
     this.bone(sk.S, sk.N, 0.075, L.skin);                                                                        // neck
-    C.translate(sk.C[0], sk.C[1]); C.rotate(-sk.hd);
+    C.translate(sk.C[0], sk.C[1]); C.rotate(-sk.hd); C.scale(0.9, 0.9);
     // hair behind the head
     poly([-0.02, 0.1, -0.15, 0.1, -0.2, 0.04, -0.16, 0.0, -0.19, -0.07, -0.13, -0.05, -0.12, -0.13, -0.05, -0.08], L.hair, INK, 0.018);
     poly([-0.19, -0.07, -0.13, -0.05, -0.12, -0.13], L.hairTip);
@@ -256,6 +258,7 @@ class Rig2D {
     // spiky fringe and crown
     poly([-0.14, 0.02, -0.15, 0.12, -0.21, 0.13, -0.12, 0.17, -0.14, 0.24, -0.05, 0.19, -0.02, 0.26, 0.04, 0.18, 0.11, 0.21, 0.1, 0.14, 0.17, 0.11, 0.1, 0.09, 0.13, 0.03, 0.06, 0.07, 0.02, 0.03, -0.02, 0.08, -0.07, 0.03], L.hair, INK, 0.018);
     poly([-0.21, 0.13, -0.12, 0.17, -0.15, 0.12], L.hairTip); poly([-0.14, 0.24, -0.05, 0.19, -0.09, 0.18], L.hairTip);
+    poly([0.04, 0.16, 0.17, 0.1, 0.15, 0.04, 0.12, 0.075, 0.11, 0.01, 0.07, 0.06, 0.03, 0.1], L.hair, INK, 0.016);   // anime bangs sweeping over the brow
     C.restore();
   }
 }
@@ -264,14 +267,14 @@ const same = c => c, far2 = c => shade(c, -0.18);
 /* =====================================================================
    COURTS, BALL, COSMETICS DATA
    ===================================================================== */
-const NET_H = 5.2, NET_MESH = 2.7, COURT_L = 30, INDOOR_SCALE = 1.1;   // a tall net over a long court
+const NET_H = 4.85, NET_MESH = 2.6, COURT_L = 30, INDOOR_SCALE = 1.1;   // a tall net over a long court
 const COURTS_BY_MAP = {
   indoor: { l: COURT_L * INDOOR_SCALE, half: COURT_L * INDOOR_SCALE / 2, wall: COURT_L * INDOOR_SCALE / 2 + 13, ceil: 18, walls: true },   // wall = how far you can chase before a ball is out
   beach:  { l: COURT_L, half: COURT_L / 2, wall: COURT_L / 2 + 13, ceil: 80, walls: false },
 };
 const courtDims = () => COURTS_BY_MAP[(S.match && S.match.map) || 'indoor'];
 const TEAM_NAME = { A: 'BLACK', B: 'WHITE' };
-const BALL_R = 0.42, BALL_G = 12.5;
+const BALL_R = 0.36, BALL_G = 12.5;
 const SKINS = {
   default:    { name: 'Classic', price: 0, rarity: 'common' },
   black:      { name: 'Black', price: 500, rarity: 'common' },
@@ -501,8 +504,22 @@ function drawSpectator(x, y, i, t, f) {
   const hop = (S.match && S.match.state === 'point') ? Math.max(0, Math.sin(t * 9 + i)) * 0.25 : Math.max(0, Math.sin(t * 2 + i * 1.7)) * 0.03;
   rr(x - 0.28, y + hop, 0.56, 0.95, 0.24, cols[i % 6]); circle(x, y + hop + 1.2, 0.26, ['#f3d1b0', '#d9a878', '#8a5a3a'][i % 3]); circle(x + f * 0.1, y + hop + 1.23, 0.035, '#27314d');
 }
+const FLOOR_FAR = 1.7, FLOOR_NEAR = 2.6, FLOOR_PERSP = 0.012;   // the indoor floor seen from a little above (Spike Cross framing)
+const persp = (x, y) => x * (1 - y * FLOOR_PERSP);
+function courtDepth(cd, col, floorCol, outCol) {
+  const h = cd.half, F = FLOOR_FAR, N = -FLOOR_NEAR, W = cd.wall + 20;
+  const quad = (x0, x1, fill) => poly([persp(x0, F), F, persp(x1, F), F, persp(x1, N), N, persp(x0, N), N], fill);
+  quad(-W, W, outCol); quad(-h, h, floorCol);
+  if (!ULTRA) for (let x = -h + 1.5; x < h; x += 1.5) line(persp(x, F), F, persp(x, N), N, 'rgba(120,50,10,.07)', 0.05);   // floor boards
+  const ln = (x0, y0, x1, y1, lw) => line(persp(x0, y0), y0, persp(x1, y1), y1, col, lw, 'butt');
+  ln(-h, F, h, F, 0.14); ln(-h, N, h, N, 0.2);                                     // far and near side lines
+  for (const e of [-h, h]) ln(e, F + 0.07, e, N - 0.1, 0.24);                      // end lines
+  for (const a of [-cd.half * 0.3, cd.half * 0.3]) ln(a, F, a, N, 0.16);          // attack lines
+  ln(0, F, 0, N, 0.14);                                                            // centre line
+}
 function courtLines(cd, col, floorCol, outCol) {       // the court painted on the floor: bold boundary blocks you can read at a glance
   const h = cd.half;
+  if (floorCol) return courtDepth(cd, col, floorCol, outCol);
   if (floorCol) { rect(-h, -0.3, h * 2, 0.3, floorCol); rect(-h - 3, -0.3, 3, 0.3, outCol); rect(h, -0.3, 3, 0.3, outCol); }
   rect(-h - 0.12, -0.34, h * 2 + 0.24, 0.1, col);                       // the side line running the length of the court
   for (const e of [-h, h]) { rect(e - 0.14, -0.9, 0.28, 0.95, col); rect(e - 0.14, -0.02, 0.28, 0.07, col); }   // end lines
@@ -512,11 +529,11 @@ function courtLines(cd, col, floorCol, outCol) {       // the court painted on t
 function drawGym(t, cd) {                           // a clean gym: pale walls, a high window band, light panels, a sprung wood floor
   worldTf(); const x0 = viewX0() - 1, x1 = viewX1() + 1; const W = cd.wall, top = cd.ceil;
   const g = C.createLinearGradient(0, 0, 0, top); g.addColorStop(0, '#dfe4ea'); g.addColorStop(1, '#f1f3f6'); C.fillStyle = g; C.fillRect(x0, 0, x1 - x0, top + 8);
-  rect(x0, 0, x1 - x0, 2.4, '#cfd6df'); rect(x0, 2.4, x1 - x0, 0.14, '#2f5fd0');                                   // wainscot + a blue stripe
+  const Fb = FLOOR_FAR; rect(x0, Fb, x1 - x0, 2.2, '#cfd6df'); rect(x0, Fb + 2.2, x1 - x0, 0.14, '#2f5fd0');         // wainscot + a blue stripe, where the floor meets the back wall
   const win = isNight ? '#27335e' : '#bfe3f7';
   for (let x = Math.floor(x0 / 5) * 5; x < x1; x += 5) { rect(x + 0.6, top - 5.2, 3.8, 2.6, win); rect(x + 2.45, top - 5.2, 0.1, 2.6, '#c4ccd6'); }   // high windows
   rect(x0, top, x1 - x0, 10, '#b8c1cd'); for (let x = Math.floor(x0 / 4) * 4; x < x1; x += 4) { rect(x, top, 0.2, 10, '#a6b0bd'); if (!ULTRA) rect(x + 1.1, top - 0.3, 1.8, 0.3, isNight ? '#fffbe6' : '#f4f1e2'); }
-  rect(x0, -9, x1 - x0, 9, '#d8a86c'); for (let x = Math.floor(x0); x < x1; x += 1.2) line(x, -9, x, 0, 'rgba(120,70,20,.13)', 0.03);
+  rect(x0, -9, x1 - x0, 9 + Fb, '#d8a86c');
   courtLines(cd, '#ffffff', '#e8864a', '#3b7bd0');
   for (const s of [-1, 1]) { const E = W + 14; rect(s < 0 ? x0 : E, 0, s < 0 ? -E - x0 : x1 - E, top, '#c9d1dc'); rect(s * E - (s < 0 ? 0.5 : 0), 0, 0.5, 2.4, '#2f5fd0'); }
 }
