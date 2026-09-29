@@ -1713,6 +1713,7 @@ function ballReach(cx, cy, r, vScale = 1, allowAcross = false) {
     if (b.scene !== S.scene || !b.active || b.held || b.frozen) continue;
     if (S.match && !S.match.practice && b.hitter === SID && b.hitType !== 'block' && b.hitType !== 'toss') continue;   // one touch each (a block does not count as your touch)
     if (b.serve && b.tossedBy && b.tossedBy !== SID) continue;
+    if (b.nt && b.nt === P.team && S.match && !S.match.practice) continue;              // your team's serve: hands off until it is over the net
     const d = Math.hypot(b.x - cx, (b.y - cy) / vScale); if (d > bd) continue;
     if (!allowAcross && acrossNet(P.x, b.x)) continue;
     bd = d; best = b;
@@ -1963,7 +1964,7 @@ function doSpike(c) {
       const vy = ss * Math.sin(pitch), tf = (vy + Math.sqrt(vy * vy + 2 * gg * B.y)) / gg;
       if (!aimed || ss * Math.cos(pitch) * tf <= R + 0.6) break; gs += 0.15;
     }
-    hitBall('spike', fwd * Math.cos(pitch) * ss, Math.sin(pitch) * ss, gs, c);
+    hitBall('spike', fwd * Math.cos(pitch) * ss, Math.sin(pitch) * ss, gs, c); B.nt = P.team; writeBall(B);
     return true;
   }
   const r = spikeSolve(B.x, B.y, fwd, tz, c, mult);
@@ -2003,7 +2004,8 @@ function doToss() {
   b.held = null; const h = P.rig.handPos('L'); b.x = h.x; b.y = h.y + BALL_R * 0.6; b.tossedBy = SID;
   if (P.serveMode) {                                                    // the aim is relative to the way you face
     const a = P.serveAim || 0; const m = Math.min(1, Math.abs(a));
-    b.serve = true; hitBall('toss', m > 0.01 ? P.f * Math.sign(a) * (0.35 + 1.2 * m) : 0, 10.3, 0.7);
+    const reach = jumpV(stat('jump')) ** 2 / (2 * G) + 1.92 * PS + spikeReach(stat('spike')) + 0.9;   // the toss peaks a little over your highest reach
+    b.serve = true; hitBall('toss', m > 0.01 ? P.f * Math.sign(a) * (0.35 + 1.2 * m) : 0, Math.sqrt(2 * BALL_G * 0.7 * Math.max(1, reach - b.y)), 0.7);
   } else { b.serve = false; hitBall('toss', P.f * 0.4, Math.sqrt(2 * BALL_G * Math.max(0.5, P.y + 1.7 * PS + 5 - b.y)), 1); }
   P.serveMode = false; P.serveAim = null;
   const M = S.match; if (M && !M.practice && M.state === 'serve') mwrite('state', 'rally');
@@ -2016,7 +2018,7 @@ function computePath(b) {                          // replay the ball's own phys
 function hitBall(type, vx, vy, g, charge = 0) {
   const b = B; if (!b) return;
   b.vx = vx; b.vy = vy; b.g = g; b.seq++; b.t = snow(); b.held = null; b.active = true; b.frozen = false; b.pf = null; b.acc = 0; b.netSide = 0;
-  b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = SID; b.hitType = type; b.fx = me.fx || 'none'; b.hm = me.model || 'boy'; b.hitterX = P.x; b.hitAtT = T; b.pu = purpleMask();
+  b.nt = null; b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = SID; b.hitType = type; b.fx = me.fx || 'none'; b.hm = me.model || 'boy'; b.hitterX = P.x; b.hitAtT = T; b.pu = purpleMask();
   if (type === 'toss' || type === 'block') { b.touches = 0; b.sideTeam = P.team; }
   else { if (b.sideTeam !== P.team) { b.sideTeam = P.team; b.touches = 1; } else b.touches++; }
   if (type !== 'toss') { b.serve = false; P.serving = false; }
@@ -2114,7 +2116,7 @@ function ballNets(b, px, py, h) {
     if (b.y < NET_H - NET_MESH + BALL_R * 0.2 && Math.abs(dx) < BALL_R + 0.12) {
       const s = Math.sign(dxp) || (b.vx > 0 ? -1 : 1); b.x = n.x + s * (BALL_R + 0.12); if (b.vx * s < 0) b.vx = -b.vx * 0.4; b.g = 1;
     }
-    if (b.id === 'match' && S.match && !S.match.practice && Math.sign(dx) !== Math.sign(dxp) && dxp !== 0 && b.y > NET_H - BALL_R) { const st = b.x < 0 ? 'A' : 'B'; if (st !== b.sideTeam) { b.sideTeam = st; b.touches = 0; } }
+    if (b.id === 'match' && S.match && !S.match.practice && Math.sign(dx) !== Math.sign(dxp) && dxp !== 0 && b.y > NET_H - BALL_R) { b.nt = null; const st = b.x < 0 ? 'A' : 'B'; if (st !== b.sideTeam) { b.sideTeam = st; b.touches = 0; } }
   }
 }
 function timeStopFactor(x, y = 0) { if (y >= 6) return 1; for (const f of FX_LIST) if (f.type === 'timestop' && Math.abs(x - f.x) < f.r) return TIMESTOP_SLOW; return 1; }
@@ -2164,7 +2166,7 @@ let ballMsg = null;
 function showBallMsg(text, b) { ballMsg = { text, b, x: b.x, y: b.y, until: performance.now() + 1500 }; }
 
 /* ---------------- Ball sync ---------------- */
-function ballRecord(b) { return { active: b.active, held: b.held || null, frozen: b.frozen, x: b.x, y: b.y, vx: b.vx, vy: b.vy, g: b.g, seq: b.seq, t: b.t, hitter: b.hitter || null, hitType: b.hitType || null, prevHitter: b.prevHitter || null, prevType: b.prevType || null, touches: b.touches, sideTeam: b.sideTeam, serve: !!b.serve, tossedBy: b.tossedBy || null, skin: b.skin || 'default', fx: b.fx || 'none', hm: b.hm || 'boy', hitterX: b.hitterX === null ? null : b.hitterX, ds: !!b.ds, pf: b.pf || null, pu: b.pu || 0, d2: 1, by: SID }; }
+function ballRecord(b) { return { active: b.active, held: b.held || null, frozen: b.frozen, x: b.x, y: b.y, vx: b.vx, vy: b.vy, g: b.g, seq: b.seq, t: b.t, hitter: b.hitter || null, hitType: b.hitType || null, prevHitter: b.prevHitter || null, prevType: b.prevType || null, touches: b.touches, sideTeam: b.sideTeam, serve: !!b.serve, tossedBy: b.tossedBy || null, skin: b.skin || 'default', fx: b.fx || 'none', hm: b.hm || 'boy', hitterX: b.hitterX === null ? null : b.hitterX, ds: !!b.ds, pf: b.pf || null, pu: b.pu || 0, nt: b.nt || null, d2: 1, by: SID }; }
 function writeBall(b) {
   if (!b || !S.online) return;
   if (b.id === 'match') { const r = mref('ball'); if (r) r.set(ballRecord(b)); }
@@ -2175,7 +2177,7 @@ function receiveBall(b, v) {
   b.seq = v.seq; b.active = !!v.active; b.held = v.held || null; b.frozen = !!v.frozen; b.g = v.g || 1; b.t = v.t || snow();
   b.hitter = v.hitter || null; b.hitType = v.hitType || null; b.prevHitter = v.prevHitter || null; b.prevType = v.prevType || null; b.touches = v.touches || 0; b.sideTeam = v.sideTeam || 'A';
   b.serve = !!v.serve; b.tossedBy = v.tossedBy || null; b.landed = false; b.netSide = 0;
-  b.skin = v.skin || 'default'; b.fx = v.fx || 'none'; b.hm = v.hm || 'boy'; b.hitterX = v.hitterX === undefined ? null : v.hitterX; b.pf = v.pf || null; b.pu = v.pu || 0; b.hitAtT = T;
+  b.skin = v.skin || 'default'; b.fx = v.fx || 'none'; b.hm = v.hm || 'boy'; b.hitterX = v.hitterX === undefined ? null : v.hitterX; b.pf = v.pf || null; b.pu = v.pu || 0; b.nt = v.nt || null; b.hitAtT = T;
   if (P.holding && B === b && b.held !== SID) { P.holding = false; P.serveMode = false; P.serveAim = null; P.rig.base = P.onGround ? 'idle' : 'air'; P.rig.setPose(P.rig.base); }
   const newHit = v.hitType === 'spike' && v.seq !== b.lastSparkSeq; b.lastSparkSeq = v.seq;
   if (b.active && !b.held) {
@@ -2987,12 +2989,12 @@ function updateMatchHud() {
    ===================================================================== */
 const BOTS = [];
 const BOT_NAMES = [['Bob', 'boy'], ['Greg', 'boy'], ['Emily', 'boy'], ['Dave', 'boy'], ['Sarah', 'boy'], ['Karen', 'boy'], ['Steve', 'boy'], ['Linda', 'boy'], ['Kevin', 'boy'], ['Jenny', 'boy'], ['Frank', 'boy'], ['Nancy', 'boy']];
-const BOT_REACH_G = 1.6 * PS, BOT_REACH_A = 1.7 * PS;
+const BOT_REACH_G = 1.85 * PS, BOT_REACH_A = 1.7 * PS;
 let botLevel = 'easy';
 const BOT_LEVELS = { easy: 40, medium: 50, hard: 50 }, BOT_BLOCK_MISS = { easy: 0.45, medium: 0.3, hard: 0.18 };
-function botStats() {                              // easy: 40 everywhere, medium: 50 everywhere, hard: 50 with one or two stats at 100
+function botStats() {                              // easy: 40 everywhere, medium: 50 everywhere, hard: 100 spike, set and jump, 50 the rest
   const st = {}; for (const k of STAT_KEYS) st[k] = BOT_LEVELS[botLevel];
-  if (botLevel === 'hard') STAT_KEYS.slice().sort(() => Math.random() - 0.5).slice(0, Math.random() < 0.5 ? 1 : 2).forEach(k => { st[k] = 100; });
+  if (botLevel === 'hard') for (const k of ['spike', 'set', 'jump']) st[k] = 100;
   return st;
 }
 const setHOf = bot => bot.jh * 0.8 + BOT_HIGH, hitHOf = bot => bot.jh * 0.92 + BOT_HIGH;
@@ -3043,7 +3045,7 @@ function botJump(bot, straight = false) { if (!bot.onGround) return; if (straigh
 function botHit(bot, type, vx, vy, g = 1) {
   const b = matchBall(); if (!b) return;
   b.vx = vx; b.vy = vy; b.g = g; b.seq++; b.t = snow(); b.held = null; b.active = true; b.frozen = false; b.pf = null; b.acc = 0; b.netSide = 0; b.pu = 0;
-  b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = bot.id; b.hitType = type; b.fx = 'none'; b.hm = bot.model; b.hitterX = bot.x; b.hitAtT = T;
+  b.nt = null; b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = bot.id; b.hitType = type; b.fx = 'none'; b.hm = bot.model; b.hitterX = bot.x; b.hitAtT = T;
   if (type === 'block') { b.touches = 0; b.sideTeam = bot.team; } else { if (b.sideTeam !== bot.team) { b.sideTeam = bot.team; b.touches = 1; } else b.touches++; }
   b.serve = false; b.spin = (Math.random() - 0.5) * 8 - vx * 1.5; b.landed = false; b.ds = false;
   if (type === 'spike') { spikeRing(b.x, b.y, vx, vy); sparkle(b.x, b.y, 14, '#ffffff', 1.3, 0.2, 0.3, 0.035, vx / 30, vy / 30); }
@@ -3056,7 +3058,7 @@ function botHit(bot, type, vx, vy, g = 1) {
   hostCheckHit();
 }
 const botReach = (bot, high) => { const b = matchBall(); if (!b || !b.active || b.held || b.frozen) return false; const cx = bot.x + bot.f * 0.3 * PS, cy = bot.y + (high ? BOT_HIGH : BOT_LOW); return Math.hypot(b.x - cx, b.y - cy) < (high ? BOT_REACH_A : BOT_REACH_G); };
-const botMayTouch = bot => { const b = matchBall(); return b && b.hitter !== bot.id && T - bot.lastHitT > 0.35; };
+const botMayTouch = bot => { const b = matchBall(); return b && b.hitter !== bot.id && b.nt !== bot.team && T - bot.lastHitT > 0.35; };
 /* spots on the court (side view: distance from the net) */
 const setterSpot = team => teamSide(team) * 1.9;
 const attackSpots = team => { const s = teamSide(team); return { front: s * 4.0, middle: s * 2.9, back: s * 7.2 }; };
@@ -3087,7 +3089,7 @@ function botServe(bot) {
   const b = matchBall(); const cd = courtDims(); const ez = -teamSide(bot.team);
   b.active = true; b.frozen = false; b.held = null; b.x = bot.x + bot.f * 0.5 * PS; b.y = bot.y + 1.1 * PS; b.hitter = null; b.hitType = null; b.prevHitter = null; b.touches = 0; b.sideTeam = bot.team; b.serve = false; b.tossedBy = null; b.landed = false; b.vx = b.vy = 0;
   const tg = ez * (cd.half / 2 + Math.random() * cd.half / 2 - 0.8);
-  const v = launchTo(b.x, b.y, tg, 0, NET_H + 3); botHit(bot, 'bump', v.x, v.y, 1);
+  const v = launchTo(b.x, b.y, tg, 0, NET_H + 3); botHit(bot, 'bump', v.x, v.y, 1); b.nt = bot.team;
   mwrite('state', 'rally');
 }
 /* a bot pass: what it costs the team and how far off it lands when they are tired */
@@ -3103,7 +3105,7 @@ function planTeam(team, bots) {
   if (!b.active || M.state !== 'rally') { for (const bot of bots) bot.target = bot.base; return; }
   if (incoming && oursTouches < 3) {
     if (oursTouches === 0) {                                                                            // RECEIVE
-      if (T - (b.hitAtT || 0) < 0.26 && b.hitType !== 'toss') return;
+      if (T - (b.hitAtT || 0) < ({ easy: 0.2, medium: 0.14, hard: 0.08 })[botLevel] && b.hitType !== 'toss') return;
       const land = pred.land.x;
       const cands = bots.filter(x => x !== setter || bots.length === 1);
       const recv = cands.reduce((a, x) => Math.abs(x.x - land) < Math.abs(a.x - land) ? x : a, cands[0]);
@@ -3112,7 +3114,7 @@ function planTeam(team, bots) {
         else if (bot === setter || (!setter && bots.length > 1)) { bot.target = setterSpot(team); bot.plan = 'setter'; }
         else { bot.target = bot.base; bot.plan = 'wait'; }
       }
-      if (recv && recv.readSeq !== b.seq) { recv.readSeq = b.seq; const sp = Math.hypot(b.vx, b.vy); recv.misread = b.hitType === 'spike' && Math.random() < clamp((sp - 14) / 32, 0, 0.55); }
+      if (recv && recv.readSeq !== b.seq) { recv.readSeq = b.seq; const sp = Math.hypot(b.vx, b.vy); recv.misread = b.hitType === 'spike' && Math.random() < clamp((sp - 20) / 45, 0, 0.35) * ({ easy: 1, medium: 0.55, hard: 0.25 })[botLevel]; }
       if (recv && recv.misread) recv.target = land - s * 1.6;
       if (recv && !recv.misread && botReach(recv, false) && botMayTouch(recv) && (b.vy < 1 || b.y < 1.6 * PS)) {   // touch 1: a high floaty pass to the setter spot
         if (teamStamina(team) <= 0.001) { const sp = Math.hypot(b.vx, b.vy), k = 0.4 + Math.random() * 0.25, pitch = (30 + Math.random() * 25) * D; botHit(recv, 'bump', s * Math.cos(pitch) * sp * k, Math.sin(pitch) * sp * k + 3, 1); showBallMsg('RECEIVE BREAK', b); recv.plan = 'wait'; return; }   // 0% stamina: the pass breaks
