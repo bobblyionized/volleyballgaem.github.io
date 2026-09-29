@@ -1520,7 +1520,8 @@ function spikeTarget(kind, team) {
   return { deep: ez * hl, deep2: ez * (hl - 1.2), middle: ez * hl * 0.55, sharp: ez * 2.2, line: ez * (hl - 2.5), tip: ez * 1.8 }[kind];
 }
 function botPickSpike(bot) {                      // decided the moment the hitter leaves the ground
-  const kinds = ['deep', 'deep2', 'middle', 'sharp', 'line', 'tip']; const kind = kinds[Math.floor(Math.random() * kinds.length)];
+  const kinds = ['deep', 'deep2', 'middle', 'sharp', 'line']; if (bot.role !== 'middle') kinds.push('tip');   // a middle always swings, never tips
+  const kind = kinds[Math.floor(Math.random() * kinds.length)];
   const tz = { deep: -0.7, deep2: -0.4, middle: 0, sharp: 0.55, line: -0.15, tip: 0 }[kind];
   bot.spike = { kind, tg: spikeTarget(kind, bot.team), tz, c: 0.5 + Math.random() * 0.5 };
 }
@@ -1678,7 +1679,7 @@ function planTeam(team, bots) {
     const cover = new Map(); let blockBy = null;
     if (size >= 3) {
       blockBy = middle || setter;
-      if (hx < 2.6) { blockBy = null; if (middle) cover.set(middle, SHORT); if (setter) cover.set(setter, FAR); }   // you are on the net: the middle takes the short ball, the setter the deep one
+      if (hx < NET_GAP + 0.3) { blockBy = null; if (middle) cover.set(middle, SHORT); if (setter) cover.set(setter, FAR); }   // you are right on the net, touching it: the middle takes the short ball, the setter the deep one
       else if (hx < cd.half / 2) { if (setter && setter !== blockBy) cover.set(setter, FAR); }                    // you are in the front half: the middle blocks, the setter drops deep
       else if (setter && setter !== blockBy) cover.set(setter, s * 3.2);                                         // you are back: the setter stays close for the short ball
     } else if (human && bots.length === 1) {
