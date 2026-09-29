@@ -1713,7 +1713,8 @@ function ballReach(cx, cy, r, vScale = 1, allowAcross = false) {
     if (b.scene !== S.scene || !b.active || b.held || b.frozen) continue;
     if (S.match && !S.match.practice && b.hitter === SID && b.hitType !== 'block' && b.hitType !== 'toss') continue;   // one touch each (a block does not count as your touch)
     if (b.serve && b.tossedBy && b.tossedBy !== SID) continue;
-    if (b.nt && b.nt === P.team && S.match && !S.match.practice) continue;              // your team's serve: hands off until it is over the net
+    if (b.nt && b.nt === P.team && S.match && !S.match.practice) continue;
+    if (S.match && b.hitter && b.hitter !== SID && T - (b.hitAtT || -9) < 1 / 6 && teamOf(b.hitter) === P.team) continue;   // a teammate just played it: no instant double-touch by accident              // your team's serve: hands off until it is over the net
     const d = Math.hypot(b.x - cx, (b.y - cy) / vScale); if (d > bd) continue;
     if (!allowAcross && acrossNet(P.x, b.x)) continue;
     bd = d; best = b;
@@ -3077,7 +3078,7 @@ function botHit(bot, type, vx, vy, g = 1) {
   hostCheckHit();
 }
 const botReach = (bot, high) => { const b = matchBall(); if (!b || !b.active || b.held || b.frozen) return false; const cx = bot.x + bot.f * 0.3 * PS, cy = bot.y + (high ? BOT_HIGH : BOT_LOW); return Math.hypot(b.x - cx, b.y - cy) < (high ? BOT_REACH_A : BOT_REACH_G); };
-const botMayTouch = bot => { const b = matchBall(); return b && b.hitter !== bot.id && b.nt !== bot.team && T - bot.lastHitT > 0.35; };
+const botMayTouch = bot => { const b = matchBall(); return b && b.hitter !== bot.id && b.nt !== bot.team && T - bot.lastHitT > 0.35 && !(b.hitter && T - (b.hitAtT || -9) < 1 / 6 && teamOf(b.hitter) === bot.team); };
 /* spots on the court (side view: distance from the net) */
 const setterSpot = team => teamSide(team) * 1.9;
 const attackSpots = team => { const s = teamSide(team); return { front: s * 4.0, middle: s * 2.9, back: s * 7.2 }; };
@@ -3155,7 +3156,6 @@ function planTeam(team, bots) {
       }
       if (recv && recv.readSeq !== b.seq) { recv.readSeq = b.seq; const sp = Math.hypot(b.vx, b.vy); recv.misread = b.hitType === 'spike' && Math.random() < clamp((sp - 20) / 45, 0, 0.35) * ({ easy: 1, medium: 0.55, hard: 0.25 })[botLevel]; }
       if (recv && recv.misread) recv.target = land - s * 1.6;
-      else if (recv && recv.onGround && !recv.dive && pred.land.t < 0.7 && Math.abs(land - recv.x) > 1.3 * PS && Math.abs(land - recv.x) < diveDist(recv.st.dive) + 2) botDive(recv, Math.sign(land - recv.x));   // can't run there in time: dive
       if (recv && !recv.misread && recv.onGround && !recv.dive && botReach(recv, false) && botMayTouch(recv) && (b.vy < 1 || b.y < 1.6 * PS)) {   // touch 1: a high floaty pass to the setter spot
         if (teamStamina(team) <= 0.001) { const sp = Math.hypot(b.vx, b.vy), k = 0.22 + Math.random() * 0.13, pitch = (30 + Math.random() * 25) * D; botHit(recv, 'bump', s * Math.cos(pitch) * sp * k, Math.sin(pitch) * sp * k + 3, 1); b.brk = true; showBallMsg('RECEIVE BREAK', b); recv.plan = 'wait'; return; }   // 0% stamina: the pass breaks
         const sc = botPass(recv, 'bump');
