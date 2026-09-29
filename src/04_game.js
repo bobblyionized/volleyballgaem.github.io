@@ -750,13 +750,13 @@ function updateCamera(dt) {
     const M = S.match;
     const server = !M || M.practice ? null : M.state === 'serve' && M.serve ? M.serve.sid : live && b.serve && b.hitType === 'toss' ? b.tossedBy : null;
     if (server) { const sv = server === SID ? P : remotes.get(server); if (sv) { bx = sv.x; by = sv.y; } }   // until the serve is struck the server pulls the camera, not the ball
-    const BP = 0.65;                                                      // the ball's pull (or the server's, before the serve): 65%, you 35%
-    const needW = Math.max(CAM_MIN_W, Math.abs(bx - P.x) * 2 * BP + 9), needH = Math.max(CAM_MIN_H, Math.abs(by - P.y) * 2 * BP + 6);   // wide enough that you (the far one from centre) stay on screen
+    const BP = 0.65, BPY = 0.3;                                           // the ball's pull (or the server's, before the serve): 65% sideways, 30% up
+    const needW = Math.max(CAM_MIN_W, Math.abs(bx - P.x) * 2 * BP + 9), needH = Math.max(CAM_MIN_H, Math.abs(by - P.y) * 2 * (1 - BPY) + 6);   // wide enough that you (the far one from centre) stay on screen
     const want = Math.max(Math.min(VW / needW, VH / needH), Math.min(VW / (2 * cd.wall), VH / 60));   // never further out than the whole hall
     camZoom = camZoom ? camZoom + (want - camZoom) * smoothT(3, dt) : want;
     const s = camZoom * (1 + camKickK * 0.25); CAM.s = s;
     const baseY = 0.24 * VH / s;                                          // the floor framing: players three quarters of the way down
-    const wantY = Math.max(baseY, P.y + (by - P.y) * BP + 1.5);
+    const wantY = Math.max(baseY, P.y + (by - P.y) * BPY + 1.5);
     camY = camY ? camY + (wantY - camY) * smoothT(5, dt) : wantY; CAM.y = Math.max(baseY, camY);
     const hw = VW / 2 / s; const wantX = clamp(P.x + (bx - P.x) * BP, -Math.max(0, cd.wall - hw), Math.max(0, cd.wall - hw));
     camScrollX += (wantX - camScrollX) * smoothT(6, dt); CAM.x = camScrollX;
