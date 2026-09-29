@@ -79,7 +79,7 @@ function makeBall(id, sceneName, skin = 'default') {
 function removeBall(id) { const b = balls.get(id); if (!b) return; balls.delete(id); if (B === b) B = null; }
 function acrossNet(ax, bx) { for (const n of netsFor()) if ((ax - n.x) * (bx - n.x) < 0) return true; return false; }
 function blockReach() {                          // the block hitbox: a column from your feet to the top of your hands, leaning with you
-  const hx = P.x + P.f * (0.3 + P.blockLean * 0.9) * PS, top = P.y + 2.25 * PS + 0.35 * PS, hw = 0.7 * PS; let best = null, bd = 1e9;
+  const hx = P.x + P.f * (0.3 + P.blockLean * 0.9) * PS, top = P.y + 2.25 * PS + 0.75 * PS, hw = 0.7 * PS; let best = null, bd = 1e9;
   for (const b of balls.values()) {
     if (b.scene !== S.scene || !b.active || b.held || b.frozen || b.hitter === SID) continue;
     if (b.y < P.y - BALL_R || b.y > top + BALL_R) continue;
@@ -270,7 +270,7 @@ function blockTouch(b, bx, by, f, nd, lean, L) {
   if (f !== nd) return { vx: -nd * Math.max(24, sp * 0.8 + 10), vy: 14, g: 0.6, kind: 'WIPE' };
   const hx = bx + f * (0.3 + lean * 0.9) * PS, hy = by + 2.25 * PS;
   const fwd = (b.x - hx) * nd, up = b.y - hy;
-  if (up > 0.15 * PS && up > Math.abs(fwd) * 0.6) return { vx: -nd * (sp * 0.25 + 1), vy: sp * 0.08 + 3, g: 1, kind: 'WIPE' };   // a hard spike's wipe lands a little past the back line
+  if (up > -0.05 * PS && up > Math.abs(fwd) * 0.3) return { vx: -nd * (sp * 0.25 + 1), vy: sp * 0.08 + 3, g: 1, kind: 'WIPE' };   // a hard spike's wipe lands a little past the back line
   if (fwd >= -0.05 && lean > 0.08) { const r = blockSolve(b, bx, nd, clamp(lean / BLOCK_LEAN, 0.3, 1), L); r.kind = sp >= 12 ? 'KILL BLOCK' : ''; return r; }
   const r = blockSolve(b, bx, nd, -1, L); r.kind = ''; return r;
 }
@@ -1620,7 +1620,7 @@ function botBlockContacts() {
   for (const bot of BOTS) {
     const s = teamSide(bot.team);
     if (bot.onGround || T >= bot.blockUntil || bot.blockMiss || b.hitter === bot.id || b.vx * s <= 0 || b.x * s > 0.9 || b.x * s < -1.3) continue;
-    const top = bot.y + 2.6 * PS; if (b.y < bot.y - BALL_R || b.y > top + BALL_R) continue; const t = clamp((b.y - bot.y) / (top - bot.y), 0, 1); if (Math.abs(b.x - (bot.x + bot.f * 0.3 * PS * t)) > 0.7 * PS + BALL_R) continue;   // feet to hands, like a player's block
+    const top = bot.y + 3.0 * PS; if (b.y < bot.y - BALL_R || b.y > top + BALL_R) continue; const t = clamp((b.y - bot.y) / (top - bot.y), 0, 1); if (Math.abs(b.x - (bot.x + bot.f * 0.3 * PS * t)) > 0.7 * PS + BALL_R) continue;   // feet to hands, like a player's block
     const r = blockTouch(b, bot.x, bot.y, bot.f, -s, (bot.blockTilt || -1) * 0.3, bot.st.block);   // the same block a player makes
     botHit(bot, 'block', r.vx, r.vy, r.g); if (r.kind) showBallMsg(r.kind, b);
   }
