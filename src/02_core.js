@@ -91,7 +91,7 @@ const snow = () => Date.now() + serverOffset;
 
 const S = { online: false, scene: 'menu', padId: null, queue: null, match: null, booted: false };
 const SID = 's' + rnd() + Date.now().toString(36);   // unique per tab
-const me = { sid: SID, id: SID, name: 'Guest', guest: true, dollars: 0, friends: {}, requests: {}, lower: null, skins: {}, skin: 'default', fxs: {}, fx: 'none', model: 'boy', models: {}, emotes: {}, wheel: {}, boxes: {}, traits: {}, loadout: {} };
+const me = { sid: SID, id: SID, name: 'Guest', guest: true, dollars: 0, friends: {}, requests: {}, lower: null, skins: {}, skin: 'default', fxs: {}, fx: 'none', model: 'boy', models: {}, emotes: {}, wheel: {}, boxes: {}, traits: {}, loadout: {}, stats: {}, bts: {}, btLoad: {} };
 
 /* ---------------- Keybinds ---------------- */
 /* Every control the game reads goes through KEYS. In 2D: A / D run, W / S aim (spike, block, bump strength,
@@ -179,7 +179,7 @@ applyKeys();
    The main menu is the home screen: PLAY (queue), INVENTORY, SHOP, QUESTS, FRIENDS & PARTY, SETTINGS.
    In a match, M opens it over the court (and closes it again). */
 let menuSec = 'play';
-const SECTIONS = ['play', 'inventory', 'shop', 'quests', 'social', 'settings'];
+const SECTIONS = ['play', 'stats', 'inventory', 'shop', 'quests', 'social', 'settings'];
 function menuOpen() { return !$('#menu').classList.contains('hidden'); }
 const inAMatch = () => S.scene === 'match' && !!S.match;
 function openMenu(sec) {
@@ -238,7 +238,7 @@ function writePresence() {
   presenceRef.onDisconnect().remove();
 }
 async function becomeGuest() {
-  me.guest = true; me.id = SID; me.lower = null; me.dollars = 0; me.friends = {}; me.requests = {}; me.skins = {}; me.skin = 'default'; me.fxs = {}; me.fx = 'none'; me.model = 'boy'; me.models = {}; me.emotes = {}; me.wheel = {}; me.boxes = {}; me.traits = {}; me.loadout = {};
+  me.guest = true; me.id = SID; me.lower = null; me.dollars = 0; me.friends = {}; me.requests = {}; me.skins = {}; me.skin = 'default'; me.fxs = {}; me.fx = 'none'; me.model = 'boy'; me.models = {}; me.emotes = {}; me.wheel = {}; me.boxes = {}; me.traits = {}; me.loadout = {}; me.stats = {}; me.bts = {}; me.btLoad = {};
   me.name = await pickGuestName();
   localStorage.removeItem('vg_session');
   applyIdentityUI(); writePresence(); onIdentityChanged();
@@ -341,7 +341,7 @@ function onIdentityChanged() {
   if (profileUnsub) profileUnsub(); if (friendsUnsub) friendsUnsub(); if (reqUnsub) reqUnsub();
   profileUnsub = friendsUnsub = reqUnsub = null;
   if (!me.guest) {
-    const pr = db.ref('profiles/' + me.id); const cb = pr.on('value', s => { const v = s.val(); if (v) { me.dollars = v.dollars || 0; if (v.name) me.name = v.name; me.skins = v.skins || {}; me.skin = v.skin || 'default'; me.fxs = v.fxs || {}; me.fx = v.fx || 'none'; me.model = v.model || 'boy'; me.models = v.models || {}; me.emotes = v.emotes || {}; me.wheel = v.wheel || {}; me.boxes = v.boxes || {}; me.traits = v.traits || {}; me.loadout = v.loadout || {}; if (typeof onCosmeticsChanged === 'function') onCosmeticsChanged(); applyIdentityUI(); if (menuOpen()) showSection(menuSec); } });
+    const pr = db.ref('profiles/' + me.id); const cb = pr.on('value', s => { const v = s.val(); if (v) { me.dollars = v.dollars || 0; if (v.name) me.name = v.name; me.skins = v.skins || {}; me.skin = v.skin || 'default'; me.fxs = v.fxs || {}; me.fx = v.fx || 'none'; me.model = v.model || 'boy'; me.models = v.models || {}; me.emotes = v.emotes || {}; me.wheel = v.wheel || {}; me.boxes = v.boxes || {}; me.traits = v.traits || {}; me.loadout = v.loadout || {}; me.stats = v.stats || {}; me.bts = v.bts || {}; me.btLoad = v.btLoad || {}; if (typeof onCosmeticsChanged === 'function') onCosmeticsChanged(); applyIdentityUI(); if (menuOpen()) showSection(menuSec); } });
     profileUnsub = () => pr.off('value', cb);
     const fr = db.ref('friends/' + me.id); const cb2 = fr.on('value', s => { me.friends = s.val() || {}; renderFriends(); });
     friendsUnsub = () => fr.off('value', cb2);
