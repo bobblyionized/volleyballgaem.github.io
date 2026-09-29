@@ -12,6 +12,8 @@ for p in parts[1:]:
         if "'" in code and code.count("'") % 2 == 1: continue          # the // is inside a string
         if re.search(r"; +(?:const |let |var |if \(|for \(|while \(|return|[A-Za-z_$][\w$.]*\s*(?:\(|=(?!=)))", comment):
             bad.append(f"{p}:{n}: comment may have swallowed code: //{comment[:90]}")
+        elif re.search(r"[A-Za-z_$][\w$.]*\([^()]*\);\s*$", comment):   # a comment ending in a call like "f(a, b);" - code pasted after a comment
+            bad.append(f"{p}:{n}: comment ends in code: //{comment[-90:]}")
 if bad:
     print('\n'.join(bad)); print('build refused'); sys.exit(1)
 out = ''.join(open(os.path.join(root, 'src', p), encoding='utf-8', newline='').read() for p in parts)

@@ -178,6 +178,7 @@ const ACT_WINDOW = 0.3;
 const BUMP_G = 0.75;                                // bumps float
 /* a pass (bump, dig or first-touch set) costs the team stamina, by how hard the ball was coming; returns the stamina left */
 function payForPass(b, kind, team = P.team, L = stat('set')) {
+  if (!S.match || S.match.state !== 'rally' || b.landed) return teamStamina(team);   // the point is already over (in, out or on the floor): playing it costs nothing
   const v = Math.hypot(b.vx, b.vy) * (b.pierceK || 1); const first = b.sideTeam !== team || b.touches === 0 || b.hitType === 'toss';   // through a broken shield: as hard to dig as before
   let cost = 0;
   if (kind === 'bump' || kind === 'dive') cost = passCost(v, L);
@@ -185,7 +186,7 @@ function payForPass(b, kind, team = P.team, L = stat('set')) {
   return cost > 0 ? spendStamina(team, cost) : teamStamina(team);
 }
 function receiveBreak(team = P.team) {           // 0% stamina: the pass breaks and the ball flies back the way it was going
-  const b = B; if (!inRealMatch() || teamStamina(team) > 0.001) return false;
+  const b = B; if (!inRealMatch() || teamStamina(team) > 0.001 || S.match.state !== 'rally' || b.landed) return false;
   const first = b.sideTeam !== team || b.touches === 0; if (!first) return false;
   const sp = Math.hypot(b.vx, b.vy); const away = -netFrom(b.x); const k = 0.22 + Math.random() * 0.13; const pitch = (30 + Math.random() * 25) * D;
   hitBall('bump', away * Math.cos(pitch) * sp * k, Math.sin(pitch) * sp * k + 3, 1); b.brk = true; showBallMsg('RECEIVE BREAK', b); camKick(0.05, 5);
@@ -270,10 +271,10 @@ function updateBlockLean() {
    back of the hands = a one-touch; blocking while turned away from the net = a wipe straight out, no saving it. */
 function blockTouch(b, bx, by, f, nd, lean, L) {
   const sp = Math.hypot(b.vx, b.vy);
-  if (f !== nd) return { vx: -nd * Math.max(24, sp * 0.8 + 10), vy: 14, g: 0.6, kind: 'WIPE' };
+  if (f !== nd) return { vx: -nd * Math.max(14, sp * 0.45 + 6), vy: 10, g: 0.8, kind: 'WIPE' };
   const hx = bx + f * (0.3 + lean * 0.9) * PS, hy = by + 2.25 * PS;
   const fwd = (b.x - hx) * nd, up = b.y - hy;
-  if (up > -0.05 * PS && up > Math.abs(fwd) * 0.3) return { vx: -nd * (sp * 0.25 + 1), vy: sp * 0.08 + 3, g: 1, kind: 'WIPE' };   // a hard spike's wipe lands a little past the back line
+  if (up > -0.05 * PS && up > Math.abs(fwd) * 0.3) return { vx: -nd * Math.min(9.5, sp * 0.17 + 1), vy: Math.min(6.2, sp * 0.06 + 3), g: 1, kind: 'WIPE' };   // off the top of the hands, back into their deep court
   if (fwd >= -0.05 && lean > 0.08) { const r = blockSolve(b, bx, nd, clamp(lean / BLOCK_LEAN, 0.3, 1), L); r.kind = sp >= 12 ? 'KILL BLOCK' : ''; return r; }
   const r = blockSolve(b, bx, nd, -1, L); r.kind = ''; return r;
 }
@@ -298,7 +299,7 @@ function blockContact() {
   P.blockHit = true; camKick(-0.03, 2.6);
   const r = shieldBlock(P, P.rig, B, () => blockTouch(B, P.x, P.y, P.f, blockNetDir(), P.blockLean, stat('block')), P.x, blockNetDir(), stat('block'));
   if (!r) { writeBall(B); return; }                                         // straight through the broken shield
-  hitBall('block', r.vx, r.vy, r.g);
+  hitBall('block', r.vx, r.vy, r.g); B.wipe = r.kind === 'WIPE';
   if (myPurple('block')) ringFx(B.x, B.y, '#b25cff', 0.3, 2.4, 0.35, 0.12); else ringFx(B.x, B.y, '#ffffff', 0.3, 1.8, 0.3, 0.08);
 }
 const FULL_T = 0.5625;
@@ -346,6 +347,10 @@ function spikeSolve(x, y, fwd, tz, c, mult = 1) {  // the spike (shared by playe
     }
     pitch = lerp(pitch, pf, Math.min(1, far / 0.3)); g = gUse;
   }
+  if (ts < 0.35 && isFinite(toNet) && toNet < 40) for (let i = 0; i < 30; i++) {   // anything but a steep W is aimed to clear the tape (the step drops heavy topspin a touch early)
+    const t = toNet / Math.max(0.5, sp * Math.cos(pitch)); const yN = y + sp * Math.sin(pitch) * t - 0.5 * BALL_G * g * t * (t + BALL_STEP);
+    if (yN >= NET_H + BALL_R + 0.2) break; pitch += 1.5 * D;
+  }
   return { vx: fwd * Math.cos(pitch) * sp, vy: Math.sin(pitch) * sp, g };
 }
 /* A ball too fast to drop in on its own gets topspin: the pitch and gravity that take it over the net at +0.6 and down at R. */
@@ -384,13 +389,15 @@ function doSpike(c) {
   const r = spikeSolve(B.x, B.y, fwd, tz, c, mult);
   hitBall('spike', r.vx, r.vy, r.g, c); return true;
 }
+/* A tip pops up 1.5x as high and drops under triple gravity - a quick little dink that lands about where it used to. */
+const TIP_G = 3, TIP_UP = Math.sqrt(1.5 * TIP_G), TIP_FWD = TIP_G / TIP_UP;
 function doTip() {
   if (!ballReach(highX(), highY() + spikeReach(stat('spike')), REACH_A, 0.6)) return false;
   if (B.serve) return doSpike(0.3);
   const fwd = P.f, tz = hitboxTilt(B, highX(), fwd);
   let sp = 7, pitch = 32 * D;
   if (tz > 0) { sp = lerp(7, 5.0, tz); pitch = lerp(32, 62, tz) * D; } else if (tz < 0) { sp = lerp(7, 8.6, -tz); pitch = lerp(32, 24, -tz) * D; }
-  hitBall('tip', fwd * Math.cos(pitch) * sp, Math.sin(pitch) * sp, 1); return true;
+  hitBall('tip', fwd * Math.cos(pitch) * sp * TIP_FWD, Math.sin(pitch) * sp * TIP_UP, TIP_G); return true;
 }
 function doDive() {
   const dir = P.moving ? P.moveDir : P.f;
@@ -432,7 +439,7 @@ function computePath(b) {                          // replay the ball's own phys
 function hitBall(type, vx, vy, g, charge = 0) {
   const b = B; if (!b) return;
   b.vx = vx; b.vy = vy; b.g = g; b.seq++; b.t = snow(); b.held = null; b.active = true; b.frozen = false; b.pf = null; b.acc = 0; b.netSide = 0;
-  b.nt = null; b.brk = false; b.quickFor = null; b.pierceK = 0; b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = SID; b.hitType = type; b.fx = me.fx || 'none'; b.hm = me.model || 'boy'; b.hitterX = P.x; b.hitAtT = T; b.pu = purpleMask();
+  b.nt = null; b.brk = false; b.quickFor = null; b.pierceK = 0; b.wipe = false; b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = SID; b.hitType = type; b.fx = me.fx || 'none'; b.hm = me.model || 'boy'; b.hitterX = P.x; b.hitAtT = T; b.pu = purpleMask();
   if (type === 'toss' || type === 'block') { b.touches = 0; b.sideTeam = P.team; }
   else { if (b.sideTeam !== P.team) { b.sideTeam = P.team; b.touches = 1; } else b.touches++; }
   if (type !== 'toss') { b.serve = false; P.serving = false; }
@@ -1136,7 +1143,7 @@ function renderPlay() {
   else if (!amLeader()) { qb.textContent = 'WAITING FOR LEADER'; qb.disabled = true; }
   else qb.textContent = prac ? 'START' : botPlay === 'bots' ? 'PLAY VS BOTS' : 'QUEUE';
   $('#queueInfo').textContent = inQ ? queueLabel() : '';
-  $('#playNote').textContent = prac ? 'Practice: free play on your own court - spawn balls, serve, try everything. Your party comes with you.' : botPlay === 'bots' ? `A local match against computer players: ${WIN_SCORE} points, win by 2. You earn a little less than online.` : ids.length > cap ? `Your party has ${ids.length} players - too many for ${selMode}.` : `Casual: first to ${WIN_SCORE}, win by 2. Every point the serve rotates. Sets go to your cursor.`;
+  $('#playNote').textContent = prac ? 'Practice: free play on your own court - spawn balls, serve, try everything. Your party comes with you.' : botPlay === 'bots' ? `A local match against computer players: ${WIN_SCORE} points, win by 2. $5,000 a win, $2,500 a loss - x1.5 on medium, x2 on hard, +20% in 3v3.` : ids.length > cap ? `Your party has ${ids.length} players - too many for ${selMode}.` : `Casual: first to ${WIN_SCORE}, win by 2. Every point the serve rotates. Sets go to your cursor.`;
 }
 function queueLabel() { const s = Math.floor(T - queueStart); return `IN QUEUE - ${S.queue.mode.toUpperCase()} - ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 $('#queueBtn').onclick = () => {
@@ -1278,9 +1285,22 @@ function onStateChange(st) {
   if (st === 'serve') { if (P.shield === 'broken') P.shield = 'normal'; if (M.bots) botsOnServe(); P.serving = false; if (b) { b.active = false; b.held = null; b.frozen = false; } if (!M.practice && prev !== st) resetToSpawn(); P.holding = false; P.serveMode = false; P.serveAim = null; if (P.rig.base === 'hold') { P.rig.base = 'idle'; P.rig.setPose('idle'); } }
   if (st === 'over' && prev !== 'over') {
     const winner = (M.score.A > M.score.B) ? 'A' : 'B'; const won = teamOf(SID) === winner;
-    if (!M.practice) { const w = M.bots ? 50 : 150, l = M.bots ? 20 : 50; addDollars(won ? w : l); toast(won ? 'Victory! +$' + w : 'Defeat. +$' + l, won ? 'ok' : 'err', 5000); }
+    if (!M.practice) { const p = matchPayout(won); addDollars(p.amount); showPayout(won, p); }
     setTimeout(() => { if (S.match && S.match.id === M.id) leaveMatch(); }, 6000);
   }
+}
+/* Match pay: $5,000 for a win, $2,500 for a loss. Bots pay 1x (easy), 1.5x (medium) or 2x (hard); 3s pays 20% more. */
+const PAY_WIN = 5000, PAY_LOSS = 2500, BOT_PAY = { easy: 1, medium: 1.5, hard: 2 };
+function matchPayout(won) {
+  const M = S.match; const parts = [];
+  let k = 1; if (M.bots) { k *= BOT_PAY[botLevel]; parts.push(botLevel.toUpperCase() + ' BOTS x' + BOT_PAY[botLevel]); }
+  if (M.mode === '3v3') { k *= 1.2; parts.push('3v3 +20%'); }
+  return { amount: Math.round((won ? PAY_WIN : PAY_LOSS) * k), note: parts.join('  ·  ') };
+}
+function showPayout(won, p) {
+  $('#payLbl').textContent = won ? 'VICTORY' : 'DEFEAT'; $('#payLbl').style.color = won ? '#7dffa8' : '#ff8a8a';
+  $('#payVal').textContent = '+$' + p.amount.toLocaleString(); $('#payMult').textContent = p.note;
+  const el = $('#payout'); el.classList.remove('on'); void el.offsetWidth; el.classList.add('on'); setTimeout(() => el.classList.remove('on'), 5800);
 }
 function spawnX(team, idx, n) { const cd = courtDims(); const frac = n <= 1 ? 0.45 : 0.18 + 0.64 * idx / (n - 1); return teamSide(team) * frac * cd.half; }
 function resetToSpawn() {                       // back to your starting spot (match start and after every point)
@@ -1356,7 +1376,7 @@ function leaveMatch() {
   BOTS.length = 0;
   matchUnsubs.forEach(f => f()); matchUnsubs = [];
   if (!M.local && S.online) { const r = db.ref('matches/' + M.id); const pref = r.child('players/' + SID); pref.onDisconnect().cancel(); pref.remove().then(() => r.child('players').once('value')).then(s => { if (!s.exists()) r.remove(); }); }
-  S.match = null; S.scene = 'menu'; remotesClear(); removeBall('match'); B = null; MATCH_NET = null; FX_LIST.length = 0; PARTS.length = 0;
+  S.match = null; S.scene = 'menu'; TRAILS.length = 0; remotesClear(); removeBall('match'); B = null; MATCH_NET = null; FX_LIST.length = 0; PARTS.length = 0;
   P.x = -4; P.y = 0; P.vx = P.vy = 0; P.f = 1; P.onGround = true; P.holding = false; P.serveMode = false; P.serving = false; P.servedKey = null; P.dive = null; P.charging = false; keys.clear();
   setMyRig('white'); P.rig.base = 'idle'; P.rig.setPose('idle'); P.rig.pitchTarget = 0;
   $('#matchHud').classList.add('hidden'); $('#bigMsg').textContent = '';
@@ -1374,10 +1394,29 @@ function teamLabel(t) {                            // a team goes by its captain
    (the court is drawn at about twice real size, so heights read halved; speeds read at 0.75x). */
 const REAL_M = 2.43 / NET_H, REAL_KMH = 3.6 * 0.75;
 let spikeInfoT = 0;
+/* Over 200 km/h a spike leaves a white streak. It grows until something happens to the ball: a touch fades it out
+   at once, the floor leaves it lying there for 3 seconds before it fades. */
+const TRAILS = [], TRAIL_KMH = 200;
+function startTrail(b) { TRAILS.push({ b, seq: b.seq, pts: [[b.x, b.y]], live: true, fadeAt: 0, fadeDur: 0 }); }
+function drawTrails() {
+  for (let i = TRAILS.length - 1; i >= 0; i--) {
+    const tr = TRAILS[i], b = tr.b;
+    if (tr.live) {
+      if (b.seq !== tr.seq || !b.active || b.held) { tr.live = false; tr.fadeAt = T; tr.fadeDur = 0.25; }       // touched: gone (quickly)
+      else { const l = tr.pts[tr.pts.length - 1]; if (Math.hypot(b.x - l[0], b.y - l[1]) > 0.25) tr.pts.push([b.x, b.y]); if (b.landed) { tr.live = false; tr.fadeAt = T + 3; tr.fadeDur = 0.6; } }   // on the floor: stays 3 s
+    }
+    const k = tr.live || T < tr.fadeAt ? 1 : 1 - (T - tr.fadeAt) / tr.fadeDur; if (k <= 0) { TRAILS.splice(i, 1); continue; }
+    const pts = tr.pts, n = pts.length; if (n < 2) continue;
+    C.save(); C.lineCap = 'butt'; C.lineJoin = 'miter';
+    for (let j = 1; j < n; j++) { C.beginPath(); C.moveTo(pts[j - 1][0], pts[j - 1][1]); C.lineTo(pts[j][0], pts[j][1]); C.strokeStyle = `rgba(255,255,255,${(0.85 * k * (0.25 + 0.75 * j / n)).toFixed(3)})`; C.lineWidth = BALL_R * 1.5; C.stroke(); }
+    C.restore();
+  }
+}
 function showSpikeInfo(vx, vy, y) {
   const kmh = Math.hypot(vx, vy) * REAL_KMH, m = Math.max(0, y) * REAL_M; const [ki, kf] = kmh.toFixed(2).split('.'), [mi, mf] = m.toFixed(2).split('.');
   $('#spikeSpd').innerHTML = `${ki}<small>.${kf} km/h</small>`; $('#spikeHt').innerHTML = `${mi}<small>.${mf} m</small>`;
   $('#spikeInfo').classList.add('on'); spikeInfoT = T + 2.6;
+  const b = matchBall(); if (b && kmh > TRAIL_KMH) startTrail(b);
 }
 function updateMatchHud() {
   if (spikeInfoT && T > spikeInfoT) { spikeInfoT = 0; $('#spikeInfo').classList.remove('on'); }
@@ -1421,7 +1460,7 @@ function updateMatchHud() {
    ===================================================================== */
 const BOTS = [];
 const BOT_NAMES = [['Bob', 'boy'], ['Greg', 'boy'], ['Emily', 'boy'], ['Dave', 'boy'], ['Sarah', 'boy'], ['Karen', 'boy'], ['Steve', 'boy'], ['Linda', 'boy'], ['Kevin', 'boy'], ['Jenny', 'boy'], ['Frank', 'boy'], ['Nancy', 'boy']];
-const BOT_REACH_G = 1.85 * HB, BOT_REACH_A = 1.7 * HB;
+const BOT_REACH_G = 1.85 * HB, BOT_REACH_A = 1.7 * HB, BOT_LEAN = 0.35;   // BOT_LEAN: how far a blocking bot leans in (or back)
 let botLevel = 'easy';
 const BOT_LEVELS = { easy: 40, medium: 50, hard: 50 }, BOT_BLOCK_MISS = { easy: 0.45, medium: 0.3, hard: 0.18 };
 function botStats() {                              // easy: 40 everywhere, medium: 50 everywhere, hard: 100 spike, set and jump, 50 the rest
@@ -1451,7 +1490,6 @@ function startBotMatch(size) {
   if (size >= 3) for (const team of ['A', 'B']) { const tb = BOTS.filter(x => x.team === team); if (tb[0]) tb[0].role = 'setter'; if (tb[1]) tb[1].role = 'middle'; }
   const M = S.match; const t = M.serve.team; const members = Object.keys(M.teams[t]).sort(); M.serve.sid = members[0]; M.serveIdx[t] = 0;
   botsOnServe(); $('#modeTxt').textContent = M.mode.toUpperCase() + ' vs ' + botLevel.toUpperCase() + ' BOTS';
-  toast('Bot match: ' + (size === 2 ? 'beach' : 'indoor') + ' court', 'ok');
 }
 function predictBall(b, opts = {}) {
   let x = b.x, y = b.y, vx = b.vx, vy = b.vy; const g = BALL_G * b.g; let t = 0; const h = 1 / 60; const wantH = opts.height; let atH = null;
@@ -1466,12 +1504,12 @@ function botStep(bot, dt) {
     if (e >= 1) { bot.dive = null; bot.rig.pitchTarget = 0; bot.rig.setPose('idle'); bot.rig.base = 'idle'; bot.vx = 0; }
     else bot.vx = bot.dive.dir * bot.dive.v0 * (1 - e * 0.6);
   } else if (bot.target !== null && bot.onGround) {
-    const dx = bot.target - bot.x, d = Math.abs(dx); const top = bot.role === 'setter' || (bot.plan && bot.plan.startsWith('set')) ? spd * 1.3 : spd;
+    const dx = bot.target - bot.x, d = Math.abs(dx); const top = bot.role === 'setter' || (bot.plan && bot.plan.startsWith('set')) ? spd * 1.5 : bot.plan === 'chase' ? spd * 1.4 : spd;   // the setter is 50% quicker than everyone; everyone sprints after a wipe or a broken pass
     bot.vx = d > 0.1 ? Math.sign(dx) * Math.min(top, d / dt) : 0;
   } else if (bot.onGround) bot.vx = 0;
   bot.vy -= G * dt; bot.x += bot.vx * dt; bot.y += bot.vy * dt;
   bot.x = s < 0 ? clamp(bot.x, -cd.wall + 1, -NET_GAP) : clamp(bot.x, NET_GAP, cd.wall - 1);
-  if (bot.y <= 0) { if (!bot.onGround) { bot.rig.setPose('land', T + 0.16); bot.rig.impact(-0.17); bot.rig.base = 'idle'; landFx(bot.x, 0, groundDustColor()); } bot.y = 0; bot.vy = 0; bot.onGround = true; bot.blockUntil = 0; }
+  if (bot.y <= 0) { if (!bot.onGround) { if (!bot.dive) bot.rig.pitchTarget = 0; bot.rig.setPose('land', T + 0.16); bot.rig.impact(-0.17); bot.rig.base = 'idle'; landFx(bot.x, 0, groundDustColor()); } bot.y = 0; bot.vy = 0; bot.onGround = true; bot.blockUntil = 0; }
   bot.f = -s;                                                                  // bots always face the net
   const r = remotes.get(bot.id); if (r) { r.x = bot.x; r.y = bot.y; r.data.f = bot.f; }
   bot.rig.moveSpeed = bot.onGround && !bot.dive && bot.rig.anim === 'idle' ? Math.abs(bot.vx) : 0; bot.rig.place(bot.x, bot.y, bot.f, bot.onGround && !bot.dive); bot.rig.update(dt, T);
@@ -1492,11 +1530,23 @@ function botDigs() {                               // a diving bot scoops up the
     payForPass(b, 'dive', team, bot.st.set); const v = launchTo(b.x, b.y, setterSpot(team), 0, Math.min(courtDims().ceil - 1, Math.max(11, b.y + 6)), BALL_G * 0.7); botHit(bot, 'dive', v.x, v.y, 0.7);
   }
 }
-function botJump(bot, straight = false) { if (!bot.onGround) return; if (straight) bot.vx = 0; bot.vy = bot.jv; bot.onGround = false; bot.rig.impact(0.14); bot.rig.base = 'air'; bot.rig.setPose('jumpUp', T + 0.18); jumpFx(bot.x, 0, groundDustColor()); }
+function bumpOverV(b, s) {                           // a free ball over the net: try arcs (deep to short, low to high) on the real physics until one clears
+  const g = BALL_G * BUMP_G; let v = null;
+  for (const tx of [6, 4, 2.5, 1.5]) for (let apex = Math.max(NET_H + 2.5, b.y + 3); apex < NET_H + 16; apex += 1) {
+    v = launchTo(b.x, b.y, -s * tx, 0, apex, g);
+    const c = { id: 'ghost', x: b.x, y: b.y, vx: v.x, vy: v.y, g: BUMP_G, netSide: 0, pf: null, acc: 0 };
+    for (let i = 0; i < 900 && c.y > BALL_R + 0.02; i++) simBall(c, BALL_STEP);
+    if (c.x * s < -0.3) return v;                                                   // it came down on their side
+  }
+  return v;
+}
+function botAttackJump(bot, tx, t) { botJump(bot); bot.vx = clamp((tx - bot.x) / Math.max(0.25, t), -4, 4); }   // carry just enough run to arrive under the ball
+function botJump(bot, straight = false) { if (!bot.onGround) return; if (straight) bot.vx = 0; bot.vy = bot.halfJump ? bot.jv * Math.SQRT1_2 : bot.jv; bot.halfJump = false;   // SQRT1_2: half the height
+  bot.onGround = false; bot.rig.impact(0.14); bot.rig.base = 'air'; bot.rig.setPose('jumpUp', T + 0.18); jumpFx(bot.x, 0, groundDustColor()); }
 function botHit(bot, type, vx, vy, g = 1) {
   const b = matchBall(); if (!b) return;
   b.vx = vx; b.vy = vy; b.g = g; b.seq++; b.t = snow(); b.held = null; b.active = true; b.frozen = false; b.pf = null; b.acc = 0; b.netSide = 0; b.pu = 0;
-  b.nt = null; b.brk = false; b.quickFor = null; b.pierceK = 0; b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = bot.id; b.hitType = type; b.fx = 'none'; b.hm = bot.model; b.hitterX = bot.x; b.hitAtT = T;
+  b.nt = null; b.brk = false; b.quickFor = null; b.pierceK = 0; b.wipe = false; b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = bot.id; b.hitType = type; b.fx = 'none'; b.hm = bot.model; b.hitterX = bot.x; b.hitAtT = T;
   if (type === 'block') { b.touches = 0; b.sideTeam = bot.team; } else { if (b.sideTeam !== bot.team) { b.sideTeam = bot.team; b.touches = 1; } else b.touches++; }
   b.serve = false; b.spin = (Math.random() - 0.5) * 8 - vx * 1.5; b.landed = false; b.ds = false;
   if (type === 'spike') { showSpikeInfo(vx, vy, b.y); spikeRing(b.x, b.y, vx, vy); sparkle(b.x, b.y, 14, '#ffffff', 1.3, 0.2, 0.3, 0.035, vx / 30, vy / 30); }
@@ -1512,24 +1562,35 @@ const botReach = (bot, high) => { const b = matchBall(); if (!b || !b.active || 
 const botMayTouch = bot => { const b = matchBall(); return b && b.hitter !== bot.id && b.nt !== bot.team && T - bot.lastHitT > 0.35 && !(b.hitter && T - (b.hitAtT || -9) < 1 / 6 && teamOf(b.hitter) === bot.team); };
 /* spots on the court (side view: distance from the net) */
 const setterSpot = team => teamSide(team) * 1.9;
-const QUICK_T = 0.24;                              // a quick is in the air this long, setter's hand to the middle's
 const attackSpots = team => { const s = teamSide(team); return { front: s * 4.0, middle: s * 2.9, back: s * 7.2 }; };
 const humanOnTeam = team => P.team === team;
 function spikeTarget(kind, team) {
   const cd = courtDims(); const ez = -teamSide(team); const hl = cd.half - 1.0;
-  return { deep: ez * hl, deep2: ez * (hl - 1.2), middle: ez * hl * 0.55, sharp: ez * 2.2, line: ez * (hl - 2.5), tip: ez * 1.8 }[kind];
+  return { deep: ez * hl, deep2: ez * (hl - 1.2), middle: ez * hl * 0.55, sharp: ez * 2.2, line: ez * (hl - 2.5), tip: ez * 1.8, wipe: ez * (hl + 6) }[kind];
 }
-function botPickSpike(bot) {                      // decided the moment the hitter leaves the ground
-  const kinds = ['deep', 'deep2', 'middle', 'sharp', 'line']; if (bot.role !== 'middle') kinds.push('tip');   // a middle always swings, never tips
+const TIP_NEAR = NET_GAP + 1.2;                     // a bot only tips a ball met this close to the net
+function blockerUp(team) {                         // is anyone on the other side up (or setting up) to block?
+  const other = BOTS.some(x => x.team !== team && (x.plan === 'block' || (!x.onGround && T < x.blockUntil)));
+  const you = S.match && P.team !== team && Math.abs(P.x) < NET_GAP + 1.5 && (!P.onGround || T < P.blockUntil);
+  return other || you;
+}
+function botPickSpike(bot, atX = (matchBall() || {}).x || 99) {   // decided the moment the hitter leaves the ground
+  const kinds = ['deep', 'deep2', 'middle', 'sharp', 'line']; if (bot.role !== 'middle' && Math.abs(atX) < TIP_NEAR) kinds.push('tip');   // tips only right on the net, and never from a middle
+  if (blockerUp(bot.team) && Math.random() < 0.35) kinds.length = 0, kinds.push('wipe');                    // someone is up to block: sometimes aim high off their hands on purpose
   const kind = kinds[Math.floor(Math.random() * kinds.length)];
-  const tz = { deep: -0.7, deep2: -0.4, middle: 0, sharp: 0.55, line: -0.15, tip: 0 }[kind];
-  bot.spike = { kind, tg: spikeTarget(kind, bot.team), tz, c: 0.5 + Math.random() * 0.5 };
+  const tz = { deep: -0.2, deep2: -0.12, middle: 0, sharp: 0.3, line: -0.08, tip: 0, wipe: -0.3 }[kind];   // the wipe is aimed flat at the top of the hands - untouched it lands about on the line
+  bot.spike = { kind, tg: spikeTarget(kind, bot.team), tz, c: kind === 'wipe' ? 0.85 : 0.5 + Math.random() * 0.5 };
 }
 function botSpike(bot) {
   const b = matchBall(); if (!bot.spike) botPickSpike(bot);
   const sp = bot.spike; bot.spike = null; const fwd = bot.f;
-  if (sp.kind === 'tip') { const pitch = 32 * D, s = 7; botHit(bot, 'tip', fwd * Math.cos(pitch) * s, Math.sin(pitch) * s, 1); return; }
-  const r = spikeSolve(b.x, b.y, fwd, sp.tz, sp.c, spikeMult(bot.st.spike));   // exactly the player's spike, at the bot's level
+  if (sp.kind === 'tip' && Math.abs(b.x) > TIP_NEAR) { botPickSpike(bot, b.x); return botSpike(bot); }   // it drifted off the net: swing instead
+  if (sp.kind === 'tip') { const pitch = 32 * D, s = 7; botHit(bot, 'tip', fwd * Math.cos(pitch) * s * TIP_FWD, Math.sin(pitch) * s * TIP_UP, TIP_G); return; }
+  let tz = sp.tz, r = spikeSolve(b.x, b.y, fwd, tz, sp.c, spikeMult(bot.st.spike));   // exactly the player's spike, at the bot's level
+  if (sp.kind !== 'wipe') for (let i = 0; i < 6 && tz < -0.01; i++) {          // a back-court shot that would sail long gets less back tilt until it lands in
+    const land = predictBall({ x: b.x, y: b.y, vx: r.vx, vy: r.vy, g: r.g }).land.x; if (Math.abs(land) < courtDims().half - 0.8) break;
+    tz *= 0.5; r = spikeSolve(b.x, b.y, fwd, tz, sp.c, spikeMult(bot.st.spike));
+  }
   botHit(bot, 'spike', r.vx, r.vy, r.g);
 }
 function botsOnServe() {
@@ -1558,17 +1619,22 @@ function botPass(bot, kind) { const b = matchBall(); const st = payForPass(b, ki
 function planTeam(team, bots) {
   const M = S.match, b = matchBall(); if (!b) return;
   const cd = courtDims(); const s = teamSide(team); const human = humanOnTeam(team);
-  const pred = predictBall(b); const incoming = Math.sign(pred.land.x) === s || (b.x * s > 0 && b.vx * s >= 0);
-  const oursTouches = b.sideTeam === team ? b.touches : 0;
+  const oursTouches = b.sideTeam === team && b.hitType !== 'block' ? b.touches : 0;
+  const pred = predictBall(b); const incoming = Math.sign(pred.land.x) === s || (b.x * s > 0 && b.vx * s >= 0)
+    || (oursTouches > 0 && oursTouches < 3 && b.x * s > -0.2 && b.hitType !== 'spike' && b.hitType !== 'tip');                // our pass or set is still ours to play, even one drifting toward the net (a quick, a tight set)
   const size = bots.length + (human ? 1 : 0);
   const setter = size >= 3 ? (bots.find(x => x.role === 'setter') || bots[0]) : null;
   const spots = attackSpots(team);
   if (!b.active || M.state !== 'rally') { for (const bot of bots) bot.target = bot.base; return; }
   if (b.serve || (b.nt === team && b.x * s > 0)) { for (const bot of bots) if (!bot.jserve) bot.target = bot.base; return; }   // our own serve in the air: hands off
-  if (b.brk && b.sideTeam === team && oursTouches >= 1 && oursTouches < 3) {                              // a broken pass: the nearest bot chases it down, diving if it has to
+  const wiped = b.wipe && b.hitType === 'block' && b.sideTeam !== team && pred.land.x * s > 0;          // wiped off their block toward our back court
+  if ((b.brk && b.sideTeam === team && oursTouches >= 1 && oursTouches < 3) || wiped) {                   // a broken pass or a wipe: chase it down, diving if it has to
     const land = pred.land.x; const cands = bots.filter(x => x.id !== b.hitter && !x.dive);
-    const ch = cands.length ? cands.reduce((a, x) => Math.abs(x.x - land) < Math.abs(a.x - land) ? x : a, cands[0]) : null;
-    for (const bot of bots) if (bot !== ch && !bot.dive) { bot.target = bot === setter ? setterSpot(team) : bot.base; bot.plan = 'wait'; }
+    const eta = x => Math.abs(x.x - land) / (x.role === 'setter' ? 1.5 : 1) + (x.onGround ? 0 : 3);   // who gets there first (the setter is quicker; anyone still in the air is late)
+    const byEta = cands.slice().sort((a, x) => eta(a) - eta(x));
+    const ch = byEta[0] || null, backup = wiped && byEta[1] ? byEta[1] : null;   // a wipe: two go after it
+    for (const bot of bots) if (bot !== ch && bot !== backup && !bot.dive) { bot.target = bot === setter ? setterSpot(team) : bot.base; bot.plan = 'wait'; }
+    if (backup && !backup.dive) { backup.target = land; backup.plan = 'chase'; if (backup.onGround && pred.land.t < 0.7 && Math.abs(land - backup.x) > 1.2 * PS && Math.abs(land - backup.x) < diveDist(backup.st.dive) + 2) botDive(backup, Math.sign(land - backup.x)); }
     if (ch) {
       ch.target = land; ch.plan = 'chase';
       if (ch.onGround && pred.land.t < 0.7 && Math.abs(land - ch.x) > 1.2 * PS && Math.abs(land - ch.x) < diveDist(ch.st.dive) + 2) botDive(ch, Math.sign(land - ch.x));
@@ -1608,13 +1674,16 @@ function planTeam(team, bots) {
         else if (human && b.hitter !== SID && Math.abs(P.x) < cd.half && Math.random() < 0.55) pick = 'human';
         else if (hitters.length) pick = hitters[Math.floor(Math.random() * hitters.length)].id;
         else if (human) pick = 'human';
+        else if (middle) pick = 'quick';                                                                         // no one else free: the middle it is
         st.plan = 'set:' + pick; st.planSeq = b.seq;
       }
       const pick = st.plan.slice(4);
+      const setAt = predictBall(b, { height: (st.onGround ? BOT_LOW + BOT_REACH_G * 0.5 : setHOf(st)) + 1.2 }).atH;   // about where (and when) the setter gets a hand on it
+      const midSpot = (st.onGround && st.target !== null ? st.target : st.x) + s * 1.4;   // a step behind the setter, who is already running under the ball
       const order = ['front', 'back', 'middle']; let k = 0;
       for (const bot of bots) {
         if (bot === st) continue;
-        if (bot === middle) { if (bot.onGround) bot.target = s * 3.4; bot.plan = 'middle'; continue; }   // the middle comes in just behind the setter
+        if (bot === middle) { if (bot.onGround) bot.target = midSpot; bot.plan = 'middle'; continue; }   // the middle comes in just behind where the setter will set
         if (bot.id === b.hitter && bots.length <= 2) { bot.target = spots.front; bot.plan = 'hitter'; continue; }
         if (k < 3) { bot.target = spots[order[k++]]; bot.plan = 'hitter'; } else { bot.target = bot.base; bot.plan = 'wait'; }
       }
@@ -1622,7 +1691,7 @@ function planTeam(team, bots) {
         const at = predictBall(b, { height: hitHOf(st) }).atH;
         if (st.onGround) {
           if (!at) { st.plan = 'set:' + (hitters.length ? hitters[0].id : human ? 'human' : middle ? 'quick' : st.id); st.planSeq = b.seq; }                         // it will never get that high: set it after all
-          else { st.target = at.x + s * 0.6; if (at.t < st.jv / G * 0.95 && Math.abs(st.x - st.target) < 1.6) { botPickSpike(st); botJump(st); } }
+          else { st.target = at.x + s * 0.6; if (at.t < st.jv / G * 0.95 && Math.abs(st.x - st.target) < 1.6) { botPickSpike(st, at.x); botAttackJump(st, st.target, at.t); } }
         } else if (botReach(st, true) && botMayTouch(st) && b.vy < 2) botSpike(st);
         return;
       }
@@ -1633,26 +1702,34 @@ function planTeam(team, bots) {
       const tRise = st.jv / G * 0.75;
       const wantJump = hi && Math.abs(st.x - (under + s * 0.35)) < 0.7 && hi.t < tRise && b.y > setH - 0.5;
       if (wantJump && st.onGround) botJump(st, true);
-      const touchAt = predictBall(b, { height: (st.onGround ? BOT_LOW + BOT_REACH_G * 0.5 : setH) + 1.2 }).atH;   // about when the setter will get a hand on it
-      if (middle && middle.onGround && !middle.dive && touchAt && touchAt.t < middle.jv / G - QUICK_T - 0.12 && Math.abs(middle.x - s * 3.4) < 2) botJump(middle, true);   // the middle goes up just before the set
-      const mY = t => middle.y + middle.vy * t - 0.5 * G * t * t;                // where the middle will be, QUICK_T from now
-      if (botMayTouch(st) && botReach(st, !st.onGround) && (!hi || !st.onGround || (b.vy < 0 && b.y < BOT_HIGH * 1.3)) && pick === 'quick' && middle && !middle.onGround && mY(QUICK_T) > 0.6) {
-        const cx = middle.x + middle.f * 0.3 * PS, cy = mY(QUICK_T) + BOT_HIGH;   // a fast, flat quick straight to the middle's hand
-        const vx = (cx - b.x) / QUICK_T, vy = (cy - b.y + 0.5 * BALL_G * QUICK_T * QUICK_T) / QUICK_T;
+      const touchAt = setAt;
+      if (middle && middle.onGround && !middle.dive && touchAt && touchAt.t < middle.jv / G * 0.55 && Math.abs(middle.x - midSpot) < 2) botJump(middle, true);   // the middle goes up just before the set
+      const mY = t => middle.y + middle.vy * t - 0.5 * G * t * t;                // where the middle will be, t from now
+      const canSet = botMayTouch(st) && botReach(st, !st.onGround) && (!hi || !st.onGround || (b.vy < 0 && b.y < BOT_HIGH * 1.3));
+      let tq = 0;                                                               // how long the quick flies: to the middle near the top of its jump
+      if (canSet && pick === 'quick' && middle && !middle.dive) {
+        if (middle.onGround && Math.abs(middle.x - midSpot) < 2.5) { botJump(middle, true); tq = middle.jv / G * 0.8; }   // late: up now, the set waits for it
+        else if (!middle.onGround) { tq = clamp(middle.vy / G, 0.18, 0.55); if (mY(tq) < 0.8) tq = 0; }
+      }
+      const qx = middle ? middle.x + middle.f * 0.3 * PS : 0;
+      if (tq > 0 && ((qx - b.x) * s < -0.6 || Math.abs(qx - b.x) > 2.2)) tq = 0;   // a quick pops more or less straight up, away from the net - never one pushed toward it
+      if (tq > 0) {
+        const cx = qx, cy = mY(tq) + BOT_HIGH;                                     // a quick straight up to the middle's hand
+        const vx = (cx - b.x) / tq, vy = (cy - b.y + 0.5 * BALL_G * tq * tq) / tq;
         botPass(st, 'set'); botHit(st, 'set', vx, vy, 1); b.quickFor = middle.id;
         st.plan = 'setter'; st.target = setterSpot(team);
-      } else if (botMayTouch(st) && botReach(st, !st.onGround) && (!hi || !st.onGround || (b.vy < 0 && b.y < BOT_HIGH * 1.3))) {
+      } else if (canSet) {
         const tg = Math.random() < 0.5 ? b.x : s * (NET_GAP + 1.6);            // bots set straight up, or just off the net - the hitter runs under it
         const sc = botPass(st, 'set');
         const hb = pick === 'human' ? null : bots.find(x => x.id === pick); const aimH = pick === 'human' ? myHitH() : hitHOf(hb || st);   // as high as the hitter can reach - your Jump when it is your set
-        const v = setAim(b.x, b.y, tg + randn() * sc, aimH + 2 + randn() * sc * 0.4, 1, st.st.set); botHit(st, 'set', v.vx, v.vy, v.g);
+        const v = setAim(b.x, b.y, tg + randn() * sc, (aimH + 2) * 1.2 + randn() * sc * 0.4, 1, st.st.set); botHit(st, 'set', v.vx, v.vy, v.g);   // sets go 20% higher
         st.plan = 'setter'; st.target = setterSpot(team);
       }
     } else {                                                                                            // ATTACK
       const qb = b.quickFor && b.hitType === 'set' && bots.find(x => x.id === b.quickFor);
       if (qb && !qb.onGround) {                                                                       // the quick: the middle is already up, swing when it gets there
         for (const bot of bots) if (bot !== qb) { bot.target = bot === setter ? setterSpot(team) : bot.base; bot.plan = 'wait'; }
-        if (botReach(qb, true) && botMayTouch(qb)) botSpike(qb);
+        if (botReach(qb, true) && b.hitter !== qb.id && T - qb.lastHitT > 0.35) { if (!qb.spike) botPickSpike(qb, b.x); botSpike(qb); }   // swing the instant it is in reach - no waiting out the teammate lockout
         return;
       }
       let cands = bots.filter(x => x.id !== b.hitter && x !== setter && x.role !== 'middle');
@@ -1665,9 +1742,9 @@ function planTeam(team, bots) {
         hitter.plan = 'attack'; hitter.target = bumpOnly ? pred.land.x + s * 0.4 : aim + s * 0.6;
         if (hitter.onGround) hitter.spike = null;
         const tLeft = spikeAt ? spikeAt.t : pred.land.t;
-        if (hitter.onGround && spikeAt && tLeft < hitter.jv / G * 0.95 && Math.abs(hitter.x - (aim + s * 0.6)) < 1.6) { botPickSpike(hitter); botJump(hitter); }
+        if (hitter.onGround && spikeAt && tLeft < hitter.jv / G * 0.95 && Math.abs(hitter.x - (aim + s * 0.6)) < 1.6) { botPickSpike(hitter, aim); botAttackJump(hitter, aim + s * 0.6, tLeft); }
         if (!hitter.onGround && botReach(hitter, true) && botMayTouch(hitter) && b.vy < 2) botSpike(hitter);
-        else if (hitter.onGround && !spikeAt && botReach(hitter, false) && botMayTouch(hitter) && b.y < 1.7 * PS) { const v = launchTo(b.x, b.y, -s * 5, 0, Math.max(NET_H + 2.5, b.y + 3), BALL_G * BUMP_G); botHit(hitter, 'bump', v.x, v.y, BUMP_G); }   // the set never got up: bump it over
+        else if (hitter.onGround && !spikeAt && botReach(hitter, false) && botMayTouch(hitter) && b.y < 1.7 * PS) { const v = bumpOverV(b, s); botHit(hitter, 'bump', v.x, v.y, BUMP_G); }   // the set never got up (or it is the middle's): bump it over
       }
     }
   } else {
@@ -1696,7 +1773,9 @@ function planTeam(team, bots) {
       blocker = blockBy;
       if (blocker) {
         blocker.plan = 'block'; blocker.target = s * (NET_GAP + 0.15);
-        if (attacker && attacker.up && blocker.onGround && Math.abs(blocker.x) < 2.2) { blocker.blockTilt = Math.random() < 0.5 ? 1 : -1; blocker.blockMiss = Math.random() < BOT_BLOCK_MISS[botLevel]; botJump(blocker, true); blocker.blockUntil = T + 10; blocker.rig.base = 'block'; blocker.rig.setPose('block'); }
+        const wingUp = onMiddle && atk.find(a => !a.mid && a.up);
+        const late = !(attacker && attacker.up) && wingUp;                    // read the middle, the wing went instead
+        if (((attacker && attacker.up) || late) && blocker.onGround && Math.abs(blocker.x) < 2.2) { if (late) blocker.halfJump = true; blocker.blockTilt = Math.random() < 0.66 ? 1 : -1; blocker.blockMiss = Math.random() < BOT_BLOCK_MISS[botLevel]; botJump(blocker, true); blocker.blockUntil = T + 10; blocker.rig.base = 'block'; blocker.rig.setPose('block'); blocker.rig.pitchTarget = blocker.blockTilt * BOT_LEAN * 0.8; }
       }
     }
     for (const bot of bots) {
@@ -1716,9 +1795,9 @@ function botBlockContacts() {
     const s = teamSide(bot.team);
     if (bot.onGround || T >= bot.blockUntil || bot.blockMiss || b.hitter === bot.id || b.vx * s <= 0 || b.x * s > 0.9 || b.x * s < -1.3) continue;
     const top = bot.y + 2.25 * PS + 0.85 * HB; if (b.y < bot.y - BALL_R || b.y > top + BALL_R) continue; const t = clamp((b.y - bot.y) / (top - bot.y), 0, 1); if (Math.abs(b.x - (bot.x + bot.f * 0.3 * PS * t)) > 0.7 * HB + BALL_R) continue;   // feet to hands, like a player's block
-    const r = shieldBlock(bot, bot.rig, b, () => blockTouch(b, bot.x, bot.y, bot.f, -s, (bot.blockTilt || -1) * 0.3, bot.st.block), bot.x, -s, bot.st.block);   // the same block (and shield) a player has
+    const r = shieldBlock(bot, bot.rig, b, () => blockTouch(b, bot.x, bot.y, bot.f, -s, (bot.blockTilt || -1) * BOT_LEAN, bot.st.block), bot.x, -s, bot.st.block);   // the same block (and shield) a player has
     if (!r) { bot.blockMiss = true; continue; }
-    botHit(bot, 'block', r.vx, r.vy, r.g);
+    botHit(bot, 'block', r.vx, r.vy, r.g); b.wipe = r.kind === 'WIPE';
   }
 }
 function updateBots(dt) {
@@ -1804,6 +1883,7 @@ function render(dt) {
     C.strokeStyle = 'rgba(255,255,255,.85)'; C.lineWidth = 0.09; C.stroke(); C.setLineDash([]); const e = p[p.length - 1]; ellipse(e[0], 0.03, 0.5, 0.12, 0, null, 'rgba(255,255,255,.8)', 0.06); C.restore();
     drawHitMark(b);
   }
+  drawTrails();
   for (const b of balls.values()) { if (b.scene !== S.scene || !b.active) continue; const x = b.x + b.visX, y = b.y + b.visY; if (!onScreen(x - 1, x + 1)) continue; ellipse(x, ballFloor(b) + 0.02, 0.32 * clamp(1 - (y - ballFloor(b)) * 0.05, 0.3, 1), 0.07, 0, `rgba(0,0,0,${clamp(0.3 - y * 0.02, 0.06, 0.3)})`); drawBallSkin(x, y, b.skin, b.rot, T, BALL_R, !b.held && b.hitter === SID && b.hitType !== 'toss'); }
   drawMarks(dt); drawParts(); drawFx('mid');
   // ---- screen space ----

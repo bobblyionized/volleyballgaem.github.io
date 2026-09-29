@@ -92,6 +92,12 @@ input:focus,select:focus{border-color:var(--yellow)}
 #touches i.on{background:var(--yellow)}
 #bigMsg{position:absolute;top:24%;left:50%;transform:translateX(-50%) skewX(-8deg);font-size:46px;font-weight:900;font-style:italic;text-shadow:0 4px 0 rgba(0,0,0,.35),0 0 18px rgba(0,0,0,.35);text-align:center;pointer-events:none;letter-spacing:1px;white-space:nowrap}
 #leaveBtn{position:absolute;bottom:14px;right:14px}
+/* end-of-match payout, bottom right */
+#payout{position:absolute;right:22px;bottom:66px;text-align:right;pointer-events:none;opacity:0;transform:translateX(60px);transition:opacity .35s,transform .45s cubic-bezier(.2,1.4,.4,1)}
+#payout.on{opacity:1;transform:none}
+#payout .pl{font-size:20px;font-weight:900;font-style:italic;letter-spacing:1px;text-shadow:0 2px 0 rgba(0,0,0,.35)}
+#payout .pv{font-size:58px;font-weight:900;font-style:italic;color:#ffd21f;line-height:1;text-shadow:0 4px 0 rgba(0,0,0,.35),0 0 20px rgba(255,210,31,.45)}
+#payout .pm{font-size:14px;font-weight:800;opacity:.85}
 #serveHint{position:absolute;bottom:120px;left:50%;transform:translateX(-50%);background:var(--yellow);color:#231a00;padding:7px 14px;border-radius:3px;font-weight:900;font-size:13px;white-space:nowrap}
 #impactFlash{position:absolute;inset:0;background:#fff;pointer-events:none;z-index:41;opacity:0;transition:opacity .22s ease-out}
 /* loading */
@@ -349,6 +355,7 @@ body.touch #chat{width:min(290px,50vw)}
     <div id="touches"><i></i><i></i><i></i></div>
     <div id="bigMsg"></div>
     <div id="serveHint" class="hidden"></div>
+    <div id="payout"><div class="pl" id="payLbl"></div><div class="pv" id="payVal"></div><div class="pm" id="payMult"></div></div>
   </div>
 
   <!-- ================= the one menu (M) ================= -->
