@@ -266,15 +266,9 @@ body.touch #chat{width:min(290px,50vw)}
 
 /* stamina: one bar per team, both teams see both (Spike Cross style) */
 #stamina{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:min(820px,96vw);display:flex;justify-content:space-between;pointer-events:none}
-.stamBar{width:min(250px,28vw);position:relative;height:22px;background:rgba(10,14,34,.8);border:2px solid rgba(255,255,255,.35);transform:skewX(-14deg);overflow:hidden}
-.stamBar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#ffd23f,#3ecf7a);transition:width .25s}
+.stamBar{width:min(260px,28vw);position:relative;height:12px;background:rgba(10,14,34,.55);transform:skewX(-14deg);overflow:hidden}
+.stamBar i{position:absolute;left:0;top:0;bottom:0;background:#ffffff;transition:width .25s}
 #stamB i{left:auto;right:0}
-.stamBar.high i{background:linear-gradient(90deg,#3ecf7a,#7dffb0)}
-.stamBar.low i{background:linear-gradient(90deg,#ff4d5e,#ff8a1f)}
-.stamBar label,.stamBar span{position:absolute;top:1px;font-size:12px;font-weight:900;font-style:italic;transform:skewX(14deg);text-shadow:0 1px 2px #000}
-.stamBar label{left:10px}.stamBar span{right:10px}
-#stamB label{left:auto;right:10px}#stamB span{right:auto;left:10px}
-.stamBar:before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 23px,rgba(0,0,0,.35) 23px 25px);z-index:1}
 /* breakthroughs */
 .btcard{--rc:#9aa0a6;position:relative;border:3px solid var(--rc);background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(0,0,0,.35));padding:10px;display:flex;flex-direction:column;gap:6px;text-align:center;color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.35)}
 .btcard .bl{font-size:44px;font-weight:900;font-style:italic;color:var(--rc);line-height:1;text-shadow:0 0 14px var(--rc)}
@@ -303,6 +297,9 @@ body.touch #chat{width:min(290px,50vw)}
 .stat .sd{grid-column:1/-1;font-size:11px;font-weight:700;opacity:.8}
 .stat .pu{color:#d9a8ff;font-weight:900}.dim{opacity:.55}
 .chip{--rc:#999;display:inline-block;border:2px solid var(--rc);padding:3px 8px;margin:0 6px 6px 0;font-size:12px;font-weight:800}.chip b{color:var(--rc);font-style:italic}
+.mchest{position:absolute;width:86px;height:86px;pointer-events:none}
+.mchest.shake{animation:chestShake .95s ease-in-out}
+.mchest.best{filter:drop-shadow(0 0 12px var(--rc))}
 </style>
 </head>
 <body>
@@ -339,7 +336,7 @@ body.touch #chat{width:min(290px,50vw)}
 
   <div id="matchHud" class="hidden">
     <button class="btn red small" id="leaveBtn">LEAVE MATCH</button>
-    <div id="stamina"><div id="stamA" class="stamBar"><i></i><label>BLACK</label><span>100%</span></div><div id="stamB" class="stamBar"><i></i><label>WHITE</label><span>100%</span></div></div>
+    <div id="stamina"><div id="stamA" class="stamBar"><i></i></div><div id="stamB" class="stamBar"><i></i></div></div>
     <div id="score"><div><span id="scoreA">0</span><small>BLACK</small></div><div>-</div><div><span id="scoreB">0</span><small>WHITE</small></div><div id="modeTxt"></div></div>
     <div id="touches"><i></i><i></i><i></i></div>
     <div id="bigMsg"></div>
@@ -1154,9 +1151,9 @@ const same = c => c, far2 = c => shade(c, -0.18);
 /* =====================================================================
    COURTS, BALL, COSMETICS DATA
    ===================================================================== */
-const NET_H = 5.86, NET_MESH = 3.0, COURT_L = 22.5, INDOOR_SCALE = 1.1;   // the net is twice the old height
+const NET_H = 5.2, NET_MESH = 2.7, COURT_L = 30, INDOOR_SCALE = 1.1;   // a tall net over a long court
 const COURTS_BY_MAP = {
-  indoor: { l: COURT_L * INDOOR_SCALE, half: COURT_L * INDOOR_SCALE / 2, wall: COURT_L * INDOOR_SCALE / 2 + 6, ceil: 18, walls: true },
+  indoor: { l: COURT_L * INDOOR_SCALE, half: COURT_L * INDOOR_SCALE / 2, wall: COURT_L * INDOOR_SCALE / 2 + 13, ceil: 18, walls: true },   // wall = how far you can chase before a ball is out
   beach:  { l: COURT_L, half: COURT_L / 2, wall: COURT_L / 2 + 13, ceil: 80, walls: false },
 };
 const courtDims = () => COURTS_BY_MAP[(S.match && S.match.map) || 'indoor'];
@@ -1408,7 +1405,7 @@ function drawGym(t, cd) {                           // a clean gym: pale walls, 
   rect(x0, top, x1 - x0, 10, '#b8c1cd'); for (let x = Math.floor(x0 / 4) * 4; x < x1; x += 4) { rect(x, top, 0.2, 10, '#a6b0bd'); if (!ULTRA) rect(x + 1.1, top - 0.3, 1.8, 0.3, isNight ? '#fffbe6' : '#f4f1e2'); }
   rect(x0, -9, x1 - x0, 9, '#d8a86c'); for (let x = Math.floor(x0); x < x1; x += 1.2) line(x, -9, x, 0, 'rgba(120,70,20,.13)', 0.03);
   courtLines(cd, '#ffffff', '#e8864a', '#3b7bd0');
-  for (const s of [-1, 1]) { rect(s < 0 ? x0 : W, 0, s < 0 ? -W - x0 : x1 - W, top, '#c9d1dc'); rect(s * W - (s < 0 ? 0.5 : 0), 0, 0.5, 2.4, '#2f5fd0'); }
+  for (const s of [-1, 1]) { const E = W + 14; rect(s < 0 ? x0 : E, 0, s < 0 ? -E - x0 : x1 - E, top, '#c9d1dc'); rect(s * E - (s < 0 ? 0.5 : 0), 0, 0.5, 2.4, '#2f5fd0'); }
 }
 
 /* =====================================================================
@@ -1803,6 +1800,13 @@ function payForPass(b, kind, team = P.team, L = stat('set')) {
   else if (kind === 'set' && first) cost = Math.min(1, passCost(v, L) * 2.2 + 0.08);   // receiving with your hands is much harder on the legs
   return cost > 0 ? spendStamina(team, cost) : teamStamina(team);
 }
+function receiveBreak(team = P.team) {           // 0% stamina: the pass breaks and the ball flies back the way it was going
+  const b = B; if (!inRealMatch() || teamStamina(team) > 0.001) return false;
+  const first = b.sideTeam !== team || b.touches === 0; if (!first) return false;
+  const sp = Math.hypot(b.vx, b.vy); const away = -netFrom(b.x); const k = 0.4 + Math.random() * 0.25; const pitch = (30 + Math.random() * 25) * D;
+  hitBall('bump', away * Math.cos(pitch) * sp * k, Math.sin(pitch) * sp * k + 3, 1); showBallMsg('RECEIVE BREAK', b); camKick(0.05, 5);
+  return true;
+}
 function doBump() { P.rig.setPose('bump', T + 0.5); P.cd = GROUND_CD; P.act = { type: 'bump', until: T + ACT_WINDOW }; setTimeout(() => actionFx('bump', P.x, P.y, P.f, myPurple('set')), 60); tryAct(); }
 function doGroundSet() { P.rig.setPose('set', T + 0.45); P.cd = GROUND_CD; P.act = { type: 'set', until: T + ACT_WINDOW }; setTimeout(() => actionFx('set', P.x, P.y, P.f, myPurple('set')), 80); tryAct(); }
 function doJumpSet() { P.airUsed = true; P.airActed = true; P.rig.base = 'airDown'; P.rig.setPose('set', T + 0.45); P.act = { type: 'jset', until: T + ACT_WINDOW }; setTimeout(() => actionFx('set', P.x, P.y, P.f, myPurple('set')), 80); tryAct(); }
@@ -1810,16 +1814,16 @@ function tryAct() {
   const a = P.act; if (!a) return;
   if (T > a.until) { P.act = null; return; }
   if (a.type === 'bump') {
-    if (!ballReach(chestX(), chestY(), REACH_G)) return; P.act = null;
-    const st = payForPass(B, 'bump'); bumpToCursor(st);
+    if (!ballReach(chestX(), chestY(), REACH_G, 0.55)) return; P.act = null;
+    if (receiveBreak()) return; const st = payForPass(B, 'bump'); bumpToCursor(st);
   } else if (a.type === 'set') {
-    if (!ballReach(chestX(), chestY() + 0.5 * PS, REACH_G + 0.2 * PS)) return; P.act = null; setToCursor(payForPass(B, 'set'));
+    if (!ballReach(chestX(), chestY() + 0.55 * PS, REACH_G, 0.5)) return; P.act = null; if (receiveBreak()) return; setToCursor(payForPass(B, 'set'));
   } else if (a.type === 'spike' || a.type === 'tip') {
     if (P.onGround) { P.act = null; return; }
     if (a.type === 'spike' ? doSpike(a.c) : doTip()) P.act = null;
   } else if (a.type === 'jset') {
     if (P.onGround) { P.act = null; return; }
-    if (!ballReach(highX(), highY(), REACH_A + 0.2 * PS)) return; P.act = null; setToCursor(payForPass(B, 'set'));
+    if (!ballReach(highX(), highY(), REACH_A, 0.5)) return; P.act = null; if (receiveBreak()) return; setToCursor(payForPass(B, 'set'));
   }
 }
 /* Bumps go to the cursor too: up over it, then down to around it. Fresh legs = right on it, tired = off target. */
@@ -1833,12 +1837,17 @@ function bumpToCursor(st) {
    Point level with yourself for a quicker, flatter set; point high for a slow, floaty one. */
 function setAim(bx, by, mx, my, g0 = 1) {
   const top = Math.min(SET_TOP(), ceilY() - 0.6);
-  let dx = mx - bx; if (dx * netFrom(bx) > 0) dx = 0;                     // pointing at the net just sends it straight up
-  const apex = clamp(my, by + 2.2, top);
+  const dx = mx - bx;
+  const apex = clamp(my, by + 1.6, top);
   const ang = Math.atan2(Math.max(0, my - by), Math.abs(dx) + 0.01) / (Math.PI / 2);
   const g = g0 * lerp(1.1, 0.72, clamp(ang, 0, 1));
   const gg = BALL_G * g; const vy = Math.sqrt(2 * gg * (apex - by)); const tUp = vy / gg;
-  return { vx: clamp(dx / tUp, -9, 9), vy, g };                           // sideways it stays a readable pace
+  let vx = clamp(dx / tUp, -12, 12);                                         // sideways, at a pace you can read
+  const nd = netFrom(bx); if (vx * nd > 0) {                                 // toward the net: fine, but it has to come down on your side
+    const tAll = tUp + Math.sqrt(2 * Math.max(0.1, apex - BALL_R) / gg); const room = Math.max(0, Math.abs(bx) - 0.9);
+    vx = nd * Math.min(Math.abs(vx), room / tAll);
+  }
+  return { vx, vy, g };
 }
 function setToCursor(st) {
   const m = worldMouse(); const sc = scatterFor(st, stat('set'));
@@ -1952,7 +1961,7 @@ function doDive() {
   const fwd = dir === P.f; P.rig.setPose(fwd ? 'dive' : 'diveB'); P.rig.pitchTarget = fwd ? 1.3 : -0.95; P.diveAnim = P.rig.pitchTarget;
 }
 function diveContact() {                          // a dig off the floor pops high and floats down
-  P.dive.hit = true; const g = 0.7; payForPass(B, 'dive');
+  P.dive.hit = true; if (receiveBreak()) return; const g = 0.7; payForPass(B, 'dive');
   const v = launchTo(B.x, B.y, P.x + P.f * 2.5, 0, Math.min(ceilY() - 0.9, Math.max(11, B.y + 6)), BALL_G * g); hitBall('dive', v.x, v.y, g);
 }
 function canSpawnHere() { return !!(S.match && S.match.practice); }
@@ -1977,6 +1986,11 @@ function doToss() {
   P.serveMode = false; P.serveAim = null;
   const M = S.match; if (M && !M.practice && M.state === 'serve') mwrite('state', 'rally');
 }
+function computePath(b) {                          // replay the ball's own physics on a copy, so the dotted line is the exact flight
+  const c = { id: 'ghost', x: b.x, y: b.y, vx: b.vx, vy: b.vy, g: b.g, netSide: 0, pf: null }; const pts = [[c.x, c.y]]; const h = BALL_STEP; const cd = courtDims();
+  for (let i = 0; i < 1200; i++) { const px = c.x, py = c.y; c.vy -= BALL_G * c.g * h; const dr = 1 - 0.015 * h; c.vx *= dr; c.vy *= dr; c.x += c.vx * h; c.y += c.vy * h; ballNets(c, px, py, h); if (c.y > cd.ceil - BALL_R) { c.y = cd.ceil - BALL_R; c.vy *= -0.5; } if (i % 3 === 2) pts.push([c.x, c.y]); if (c.y < BALL_R || Math.abs(c.x) > cd.wall + 2) { pts.push([c.x, Math.max(BALL_R, c.y)]); break; } }
+  return pts;
+}
 function hitBall(type, vx, vy, g, charge = 0) {
   const b = B; if (!b) return;
   b.vx = vx; b.vy = vy; b.g = g; b.seq++; b.t = snow(); b.held = null; b.active = true; b.frozen = false; b.pf = null; b.acc = 0; b.netSide = 0;
@@ -1986,6 +2000,7 @@ function hitBall(type, vx, vy, g, charge = 0) {
   if (type !== 'toss') { b.serve = false; P.serving = false; }
   b.spin = (Math.random() - 0.5) * 8 - vx * 1.5; b.landed = false; b.ds = false;
   if (type === 'spike') { spikeRing(b.x, b.y, vx, vy, (b.pu & PU.spike) !== 0); sparkle(b.x, b.y, 14, '#ffffff', 1.3, 0.2, 0.3, 0.035, vx / 30, vy / 30); }
+  b.path = type === 'set' ? computePath(b) : null; b.pathI = 0;
   writeBall(b); hostCheckHit();
 }
 
@@ -2019,7 +2034,7 @@ function updatePlayer(dt) {
   P.vy -= G * sdt;
   const prevX = P.x; P.x += P.vx * sdt; P.y += P.vy * sdt;
   let landed = false; if (P.y <= 0 && P.vy <= 0) { P.y = 0; if (!P.onGround) landed = true; }
-  const cd = courtDims(); P.x = clamp(P.x, -cd.wall + 0.7, cd.wall - 0.7);
+  const cd = courtDims(); P.x = clamp(P.x, -cd.wall + 1, cd.wall - 1);
   if (!S.match.practice) { P.x = P.team === 'A' ? Math.min(P.x, -NET_GAP) : Math.max(P.x, NET_GAP); if (P.serving && P.onGround) { const back = cd.half + 0.35; P.x = P.team === 'A' ? Math.min(P.x, -back) : Math.max(P.x, back); } }
   for (const n of netsFor()) {
     const dp = prevX - n.x, dc = P.x - n.x;
@@ -2088,8 +2103,9 @@ function simBall(b, h) {
   b.x += b.vx * h; b.y += b.vy * h;
   ballNets(b, px, py, h);
   const cd = courtDims();
-  if (Math.abs(b.x) > cd.wall - BALL_R) { b.x = Math.sign(b.x) * (cd.wall - BALL_R); b.vx *= -0.5; }
-  if (b.y > cd.ceil - BALL_R) { b.y = cd.ceil - BALL_R; b.vy *= -0.5; }
+  if (Math.abs(b.x) > cd.wall && b.id === 'match' && M && !M.practice && M.state === 'rally' && isHost()) hostBallOut();   // gone past where anyone can chase it
+  if (b.y > cd.ceil - BALL_R) { b.y = cd.ceil - BALL_R; b.vy *= -0.5; if (b.id === 'match' && M && !M.practice && M.state === 'rally' && isHost()) hostBallOut(); }
+  if (Math.abs(b.x) > cd.wall + 30) { b.vx = 0; b.vy = 0; b.y = BALL_R; b.frozen = true; }                // far away and forgotten
   if (b.y < BALL_R) {
     b.y = BALL_R; b.serve = false;
     if (!b.landed) {
@@ -2116,7 +2132,7 @@ function updateBalls(dt) {
     if (!ULTRA && (b.pu & PU.set) && (b.hitType === 'set' || b.hitType === 'bump') && T - (b.hitAtT || 0) < 1.2 && !b.landed) addPart({ kind: 'dot', x: b.x, y: b.y, vx: 0, vy: 0, g: 0, drag: 0, life: 0.5, size: BALL_R * 0.7, col: Math.random() < 0.5 ? '#b25cff' : '#e0b8ff' });   // Set 100: a purple trail
     if (b.skin === 'fire' && !ULTRA && Math.hypot(b.vx, b.vy) > 3 && Math.random() < 0.6) addPart({ kind: 'dot', x: b.x, y: b.y, vx: -b.vx * 0.1, vy: 0.6, g: -1, drag: 2, life: 0.35, size: 0.1, col: Math.random() < 0.5 ? '#ffb02a' : '#ff5a1f' });
   }
-  if (T < P.blockUntil && !P.blockHit && ballReach(highX() + P.f * P.blockLean * 0.9 * PS, highY() + 0.3 * PS, 1.35 * PS, 1, true) && B.hitter !== SID && B.vx * netDir() < 0 && Math.abs(B.x) < NET_GAP + 3.2) blockContact();   // blocks reach over the net and lean with you
+  if (T < P.blockUntil && !P.blockHit && ballReach(highX() + P.f * P.blockLean * 0.9 * PS, highY() + 0.3 * PS, 1.35 * PS, 0.55, true) && B.hitter !== SID && B.vx * netDir() < 0 && Math.abs(B.x) < NET_GAP + 3.2) blockContact();   // blocks reach over the net and lean with you
   if (P.dive && !P.dive.hit && ballReach(P.x + P.dive.dir * 1.0 * PS, P.y + 0.6 * PS, 1.8 * PS)) diveContact();
 }
 /* ---- "TOO LOW" popup at the ball ---- */
@@ -2146,7 +2162,8 @@ function receiveBall(b, v) {
     if (!b.frozen && dt > 0) { let left = dt; while (left > 1e-6) { const hh = Math.min(BALL_STEP, left); simBall(b, hh); left -= hh; } }   // catch up with the same fixed-step physics everyone runs
     if (wasShown && !newHit) { const ox = bx - b.x, oy = by - b.y; if (Math.hypot(ox, oy) < 1.5) { b.visX = ox; b.visY = oy; } else { b.visX = b.visY = 0; } } else { b.visX = b.visY = 0; }
     b.spin = (Math.random() - 0.5) * 8 - b.vx * 1.5;
-  }
+    b.path = v.hitType === 'set' ? computePath(b) : null; b.pathI = 0;
+  } else b.path = null;
   if (b.id === 'match') hostCheckHit();
 }
 /* ---------------- Remote players ---------------- */
@@ -2295,13 +2312,17 @@ function addBubble(sid, text) { if (!sid || !text) return; let b = BUBBLES.get(s
 function sidForName(n) { for (const [sid, r] of remotes) if ((r.data && r.data.name) === n) return sid; return n === me.name ? SID : null; }
 
 /* ---------------- Camera ---------------- */
-let camKickK = 0, camShake = 0;
+let camKickK = 0, camShake = 0, camScrollX = 0;
 function camKick(zoom, shake) { camKickK = clamp(camKickK + zoom, -0.2, 0.2); camShake = Math.min(0.6, camShake + shake * 0.03); }
 function updateCamera(dt) {
   camKickK *= Math.exp(-dt * 7); camShake *= Math.exp(-dt * 9);
   if (S.scene === 'match') {
-    const cd = courtDims(); const s = Math.min(VW / (2 * (cd.half + 4.6)), VH / 19) * (1 + camKickK * 0.25);
-    CAM.s = s; CAM.x = 0; CAM.y = 0.31 * VH / s;   // the floor band keeps the bottom fifth of the screen, under the action cards
+    const cd = courtDims(); const s = Math.min(VW / (2 * (cd.half + 3.5)), VH / 19) * (1 + camKickK * 0.25);
+    CAM.s = s; CAM.y = 0.31 * VH / s;   // the floor band keeps the bottom fifth of the screen, under the action cards
+    const hw = VW / 2 / s, pad = Math.min(4, hw * 0.25); let want = 0;
+    if (P.x > hw - pad) want = P.x - (hw - pad); else if (P.x < -hw + pad) want = P.x + (hw - pad);   // semi-scrolling: the view only moves once you run off it
+    want = clamp(want, -(cd.wall - hw + 2), cd.wall - hw + 2);
+    camScrollX += (want - camScrollX) * smoothT(6, dt); CAM.x = camScrollX;
   }
   if (camShake > 0.002) { const st = performance.now() * 0.001; shakeX = Math.sin(st * 47) * camShake * 10; shakeY = Math.sin(st * 61 + 1.7) * camShake * 10; } else { shakeX = shakeY = 0; }
 }
@@ -2378,37 +2399,45 @@ function rollBreakthrough() {
 function renderBtShop() {
   $('#shopNote').textContent = 'Breakthroughs add to your stats - equip up to 3 in Inventory. X breakthroughs are abilities (one at a time).' + (me.guest ? ' (Log in to open.)' : '');
   const d = document.createElement('div'); d.className = 'item b-legendary'; d.style.gridColumn = 'span 2';
-  d.innerHTML = `<img src="${ICONS.bt_box || ''}" alt=""><div class="nm">Breakthrough Box</div><div class="rar r-legendary">D - C - B - A - S - X</div><div class="pr">$${BT_COST}</div><button>OPEN ($${BT_COST})</button>`;
-  d.querySelector('button').onclick = buyBreakthrough; $('#shopGrid').appendChild(d);
+  d.innerHTML = `<img src="${ICONS.bt_box || ''}" alt=""><div class="nm">Breakthrough Box</div><div class="rar r-legendary">D - C - B - A - S - X</div><div class="pr">$${BT_COST} each</div><div class="row" style="gap:6px"><button data-n="1">OPEN 1</button><button data-n="5">OPEN 5 ($${(BT_COST * 5).toLocaleString()})</button><button data-n="10">OPEN 10 ($${(BT_COST * 10).toLocaleString()})</button></div>`;
+  d.querySelectorAll('button').forEach(b => b.onclick = () => buyBreakthrough(+b.dataset.n)); $('#shopGrid').appendChild(d);
   $('#btOdds').innerHTML = BT_RARITY.map((r, i) => `<div class="odd" style="--rc:${BT_COLOR[r]}"><b>${r}</b><span>${Math.round(BT_ODDS[i] * 100)}%</span><small>${r === 'X' ? 'ability' : r === 'S' ? '+50' : `+${BT_RANGE[r][0]} to +${BT_RANGE[r][1]}`}</small></div>`).join('');
 }
 let opening = false;
-async function buyBreakthrough() {
+async function buyBreakthrough(n = 1) {
   if (me.guest) { toast('Log in to open breakthroughs (Settings > Account)', 'err'); return; }
   if (opening) return; opening = true;
-  const bt = rollBreakthrough(); const key = 'k' + Date.now().toString(36) + rnd();
-  const res = await db.ref('profiles/' + me.id).transaction(pr => { if (!pr) return pr; if ((pr.dollars || 0) < BT_COST) return; pr.dollars = (pr.dollars || 0) - BT_COST; pr.bts = pr.bts || {}; pr.bts[key] = bt; return pr; });
-  if (!res.committed) { opening = false; toast(`Not enough dollars ($${BT_COST} needed)`, 'err'); return; }
-  playOpen(bt);
+  const rolls = []; for (let i = 0; i < n; i++) rolls.push(rollBreakthrough()); const price = BT_COST * n;
+  const res = await db.ref('profiles/' + me.id).transaction(pr => { if (!pr) return pr; if ((pr.dollars || 0) < price) return; pr.dollars = (pr.dollars || 0) - price; pr.bts = pr.bts || {}; rolls.forEach((bt, i) => { pr.bts['k' + Date.now().toString(36) + i + rnd()] = bt; }); return pr; });
+  if (!res.committed) { opening = false; toast(`Not enough dollars ($${price.toLocaleString()} needed)`, 'err'); return; }
+  playOpen(rolls);
 }
-function playOpen(bt) {                             // the box rattles, bursts open and throws the breakthrough card out
-  const fx = $('#openFx'), chest = $('#openChest'), burst = $('#openBurst'), card = $('#openCard'), msg = $('#openMsg'), done = $('#openDone');
-  fx.classList.remove('hidden'); fx.querySelectorAll('.spark').forEach(s => s.remove());
-  chest.src = ICONS.bt_box || ''; chest.classList.remove('shake'); void chest.offsetWidth; chest.classList.add('shake');
+const btRank = bt => BT_RARITY.indexOf(bt.r) * 100 + (bt.v || 0);
+function playOpen(list) {                           // every box rattles and bursts; only the best breakthrough is thrown out as a card
+  if (!Array.isArray(list)) list = [list];
+  const best = list.reduce((a, b) => btRank(b) > btRank(a) ? b : a, list[0]); const n = list.length;
+  const fx = $('#openFx'), chest = $('#openChest'), burst = $('#openBurst'), card = $('#openCard'), msg = $('#openMsg'), done = $('#openDone'), stage = $('#openStage');
+  fx.classList.remove('hidden'); fx.querySelectorAll('.spark,.mchest').forEach(s => s.remove());
   burst.classList.remove('go'); card.classList.remove('fly'); card.style.opacity = 0; msg.style.opacity = 0; done.style.opacity = 0; done.classList.remove('ready'); fx.classList.remove('ready');
-  card.className = 'btcard big'; card.style.setProperty('--rc', BT_COLOR[bt.r]); card.innerHTML = `<div class="bl">${bt.r}</div><div class="bn">${esc(btLabel(bt))}</div><div class="bd">${esc(btDesc(bt))}</div>`;
-  burst.style.background = BT_COLOR[bt.r];
-  const stage = $('#openStage');
+  card.className = 'btcard big'; card.style.setProperty('--rc', BT_COLOR[best.r]); card.innerHTML = `<div class="bl">${best.r}</div><div class="bn">${esc(btLabel(best))}</div><div class="bd">${esc(btDesc(best))}</div>`;
+  burst.style.background = BT_COLOR[best.r];
+  const chests = [];
+  if (n === 1) { chest.classList.remove('hidden'); chest.src = ICONS.bt_box || ''; chest.classList.remove('shake'); void chest.offsetWidth; chest.classList.add('shake'); }
+  else {
+    chest.classList.add('hidden'); const cols = Math.min(5, n), rows = Math.ceil(n / cols);
+    list.forEach((bt, i) => { const im = document.createElement('img'); im.className = 'mchest shake'; im.src = ICONS.bt_box || ''; const c = i % cols, r = Math.floor(i / cols); im.style.left = (210 - cols * 45 + c * 90 - 43 + 45) + 'px'; im.style.top = (250 + r * 92 - (rows - 1) * 46) + 'px'; im.style.animationDelay = (i * 0.04) + 's'; im.style.setProperty('--rc', BT_COLOR[bt.r]); stage.appendChild(im); chests.push([im, bt]); });
+  }
   setTimeout(() => {
     if (fx.classList.contains('hidden')) return;
-    chest.src = ICONS.bt_boxopen || chest.src; chest.classList.remove('shake');
+    if (n === 1) { chest.src = ICONS.bt_boxopen || chest.src; chest.classList.remove('shake'); }
+    for (const [im, bt] of chests) { im.src = ICONS.bt_boxopen || im.src; im.classList.remove('shake'); if (bt === best) im.classList.add('best'); }
     burst.classList.add('go'); card.classList.add('fly'); card.style.opacity = '';
-    const n = bt.r === 'X' || bt.r === 'S' ? 40 : 18;
-    for (let i = 0; i < n; i++) { const s = document.createElement('div'); s.className = 'spark'; const a = Math.random() * Math.PI * 2, r = 90 + Math.random() * 150; s.style.setProperty('--dx', Math.cos(a) * r + 'px'); s.style.setProperty('--dy', (Math.sin(a) * r - 60) + 'px'); s.style.background = i % 3 ? BT_COLOR[bt.r] : '#fff'; stage.appendChild(s); }
-    setTimeout(() => { msg.innerHTML = `${bt.r} BREAKTHROUGH<small>${esc(btLabel(bt))} - equip it in Inventory > Breakthroughs</small>`; msg.style.opacity = 1; done.style.opacity = 1; done.classList.add('ready'); fx.classList.add('ready'); }, 900);
+    const k = best.r === 'X' || best.r === 'S' ? 40 : 18;
+    for (let i = 0; i < k; i++) { const s = document.createElement('div'); s.className = 'spark'; const a = Math.random() * Math.PI * 2, r = 90 + Math.random() * 150; s.style.setProperty('--dx', Math.cos(a) * r + 'px'); s.style.setProperty('--dy', (Math.sin(a) * r - 60) + 'px'); s.style.background = i % 3 ? BT_COLOR[best.r] : '#fff'; stage.appendChild(s); }
+    setTimeout(() => { msg.innerHTML = `${n > 1 ? 'BEST OF ' + n + ': ' : ''}${best.r} BREAKTHROUGH<small>${esc(btLabel(best))}${n > 1 ? ` - all ${n} are in Inventory > Breakthroughs` : ' - equip it in Inventory > Breakthroughs'}</small>`; msg.style.opacity = 1; done.style.opacity = 1; done.classList.add('ready'); fx.classList.add('ready'); }, 900);
   }, 950);
 }
-function finishOpen() { $('#openFx').classList.add('hidden'); $('#openFx').classList.remove('ready'); opening = false; invTab = 'bt'; openMenu('inventory'); }
+function finishOpen() { $('#openFx').querySelectorAll('.mchest').forEach(s => s.remove()); $('#openChest').classList.remove('hidden'); $('#openFx').classList.add('hidden'); $('#openFx').classList.remove('ready'); opening = false; invTab = 'bt'; openMenu('inventory'); }
 $('#openDone').onclick = e => { e.stopPropagation(); finishOpen(); };
 $('#openFx').addEventListener('click', e => { if (e.currentTarget.classList.contains('ready')) finishOpen(); });
 document.addEventListener('keydown', e => { if (!$('#openFx').classList.contains('hidden') && $('#openFx').classList.contains('ready') && (e.code === 'Space' || e.code === 'Enter')) finishOpen(); });
@@ -2783,6 +2812,7 @@ function hostCheckHit() {
   if (b.touches > 3) return endPoint(opp(b.sideTeam), '4 TOUCHES');
   if (b.hitter === b.prevHitter && b.hitType !== 'block' && b.prevType !== 'block' && b.prevType !== 'toss' && b.prevType) return endPoint(opp(teamOf(b.hitter)), 'DOUBLE HIT');
 }
+function hostBallOut() { const M = S.match, b = matchBall(); if (!M || !b || M.state !== 'rally') return; const lastTeam = b.hitter ? teamOf(b.hitter) : (M.serve ? M.serve.team : 'A'); endPoint(opp(lastTeam), 'OUT'); }
 function hostBallLanded() {
   const M = S.match, b = matchBall(); if (!M || !b || M.state !== 'rally') return;
   const cd = courtDims();
@@ -2905,7 +2935,7 @@ function updateMatchHud() {
   const setText = (sel, v) => { const el = $(sel); if (el.textContent !== String(v)) el.textContent = v; };
   setText('#scoreA', M.score.A || 0); setText('#scoreB', M.score.B || 0);
   $('#stamina').classList.toggle('hidden', !!M.practice);
-  if (!M.practice) for (const t of ['A', 'B']) { const v = teamStamina(t); const el = $('#stam' + t); el.querySelector('i').style.width = (v * 100).toFixed(1) + '%'; el.classList.toggle('low', v < 0.25); el.classList.toggle('high', v >= 0.75); setText('#stam' + t + ' span', Math.round(v * 100) + '%'); }
+  if (!M.practice) for (const t of ['A', 'B']) $('#stam' + t + ' i').style.width = (teamStamina(t) * 100).toFixed(1) + '%';
   $$('#touches i').forEach((el, i) => { const on = !!b && i < b.touches && b.active; if (el.classList.contains('on') !== on) el.classList.toggle('on', on); });
   setText('#bigMsg', M.msg || '');
   const sh = $('#serveHint'); let hint = '';
@@ -2968,7 +2998,7 @@ function botStep(bot, dt) {
     bot.vx = d > 0.1 ? Math.sign(dx) * Math.min(top, d / dt) : 0;
   } else if (bot.onGround) bot.vx = 0;
   bot.vy -= G * dt; bot.x += bot.vx * dt; bot.y += bot.vy * dt;
-  bot.x = s < 0 ? clamp(bot.x, -cd.half - 3, -NET_GAP) : clamp(bot.x, NET_GAP, cd.half + 3);
+  bot.x = s < 0 ? clamp(bot.x, -cd.wall + 1, -NET_GAP) : clamp(bot.x, NET_GAP, cd.wall - 1);
   if (bot.y <= 0) { if (!bot.onGround) { bot.rig.setPose('land', T + 0.16); bot.rig.impact(-0.17); bot.rig.base = 'idle'; landFx(bot.x, 0, groundDustColor()); } bot.y = 0; bot.vy = 0; bot.onGround = true; bot.blockUntil = 0; }
   bot.f = -s;                                                                  // bots always face the net
   const r = remotes.get(bot.id); if (r) { r.x = bot.x; r.y = bot.y; r.data.f = bot.f; }
@@ -2983,6 +3013,7 @@ function botHit(bot, type, vx, vy, g = 1) {
   if (type === 'block') { b.touches = 0; b.sideTeam = bot.team; } else { if (b.sideTeam !== bot.team) { b.sideTeam = bot.team; b.touches = 1; } else b.touches++; }
   b.serve = false; b.spin = (Math.random() - 0.5) * 8 - vx * 1.5; b.landed = false; b.ds = false;
   if (type === 'spike') { spikeRing(b.x, b.y, vx, vy); sparkle(b.x, b.y, 14, '#ffffff', 1.3, 0.2, 0.3, 0.035, vx / 30, vy / 30); }
+  b.path = type === 'set' ? computePath(b) : null; b.pathI = 0;
   if (type === 'bump') { bot.rig.setPose('bump', T + 0.45); setTimeout(() => actionFx('bump', bot.x, bot.y, bot.f), 60); }
   else if (type === 'set') { bot.rig.setPose('set', T + 0.45); if (!bot.onGround) bot.rig.base = 'airDown'; setTimeout(() => actionFx('set', bot.x, bot.y, bot.f), 80); }
   else if (type === 'spike' || type === 'tip') { bot.rig.setPose(type === 'tip' ? 'tip' : 'spikeHit', T + 0.4); bot.rig.base = 'airDown'; actionFx('spike', bot.x, bot.y, bot.f); }
@@ -3051,6 +3082,7 @@ function planTeam(team, bots) {
       if (recv && recv.readSeq !== b.seq) { recv.readSeq = b.seq; const sp = Math.hypot(b.vx, b.vy); recv.misread = b.hitType === 'spike' && Math.random() < clamp((sp - 14) / 32, 0, 0.55); }
       if (recv && recv.misread) recv.target = land - s * 1.6;
       if (recv && !recv.misread && botReach(recv, false) && botMayTouch(recv) && (b.vy < 1 || b.y < 1.6 * PS)) {   // touch 1: a high floaty pass to the setter spot
+        if (teamStamina(team) <= 0.001) { const sp = Math.hypot(b.vx, b.vy), k = 0.4 + Math.random() * 0.25, pitch = (30 + Math.random() * 25) * D; botHit(recv, 'bump', s * Math.cos(pitch) * sp * k, Math.sin(pitch) * sp * k + 3, 1); showBallMsg('RECEIVE BREAK', b); recv.plan = 'wait'; return; }   // 0% stamina: the pass breaks
         const sc = botPass(recv, 'bump');
         const v = launchTo(b.x, b.y, setterSpot(team) + randn() * sc, 0, Math.max(10, b.y + 5), BALL_G * BUMP_G);
         botHit(recv, 'bump', v.x, v.y, BUMP_G);
@@ -3081,10 +3113,9 @@ function planTeam(team, bots) {
       const wantJump = hi && Math.abs(st.x - (under + s * 0.35)) < 0.7 && hi.t < tRise && b.y > setH - 0.5;
       if (wantJump && st.onGround) botJump(st, true);
       if (botMayTouch(st) && botReach(st, !st.onGround) && (!hi || !st.onGround || (b.vy < 0 && b.y < BOT_HIGH * 1.3))) {
-        let tg; if (pick === 'human') tg = Math.abs(P.x - spots.front) < Math.abs(P.x - spots.back) ? spots.front : spots.back;
-        else { const hb = bots.find(x => x.id === pick); tg = hb && hb.target !== null ? hb.target : spots.front; }
+        const tg = Math.random() < 0.5 ? b.x : s * (NET_GAP + 1.6);            // bots set straight up, or just off the net - the hitter runs under it
         const sc = botPass(st, 'set');
-        const v = setAim(b.x, b.y, tg + s * 0.6 + randn() * sc, hitH + 1.8 + randn() * sc * 0.4); botHit(st, 'set', v.vx, v.vy, v.g);   // the same set a player makes, aimed at the hitter
+        const v = setAim(b.x, b.y, tg + randn() * sc, hitH + 2 + randn() * sc * 0.4); botHit(st, 'set', v.vx, v.vy, v.g);
         st.plan = 'setter'; st.target = setterSpot(team);
       }
     } else {                                                                                            // ATTACK
@@ -3180,6 +3211,12 @@ function render(dt) {
   for (const n of netsFor()) if (onScreen(n.x - 1, n.x + 1)) n.draw(T);
   for (const r of remotes.values()) if (onScreen(r.x - 2, r.x + 2)) r.rig.draw();
   P.rig.draw();
+  for (const b of balls.values()) {                // the dotted path of the last set, from where the ball is now
+    if (!b.active || !b.path || b.held) continue; const p = b.path; if (b.landed) { b.path = null; continue; }
+    while (b.pathI < p.length - 1 && Math.hypot(p[b.pathI + 1][0] - b.x, p[b.pathI + 1][1] - b.y) < Math.hypot(p[b.pathI][0] - b.x, p[b.pathI][1] - b.y)) b.pathI++;
+    C.save(); C.setLineDash([0.25, 0.3]); C.lineCap = 'round'; C.beginPath(); C.moveTo(b.x, b.y); for (let i = b.pathI + 1; i < p.length; i++) C.lineTo(p[i][0], p[i][1]);
+    C.strokeStyle = 'rgba(255,255,255,.85)'; C.lineWidth = 0.09; C.stroke(); C.setLineDash([]); const e = p[p.length - 1]; ellipse(e[0], 0.03, 0.5, 0.12, 0, null, 'rgba(255,255,255,.8)', 0.06); C.restore();
+  }
   for (const b of balls.values()) { if (b.scene !== S.scene || !b.active) continue; const x = b.x + b.visX, y = b.y + b.visY; if (!onScreen(x - 1, x + 1)) continue; ellipse(x, ballFloor(b) + 0.02, 0.32 * clamp(1 - (y - ballFloor(b)) * 0.05, 0.3, 1), 0.07, 0, `rgba(0,0,0,${clamp(0.3 - y * 0.02, 0.06, 0.3)})`); drawBallSkin(x, y, b.skin, b.rot, T, BALL_R, !b.held && b.hitter === SID && b.hitType !== 'toss'); }
   drawMarks(dt); drawParts(); drawFx('mid');
   // ---- screen space ----

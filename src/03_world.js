@@ -264,9 +264,9 @@ const same = c => c, far2 = c => shade(c, -0.18);
 /* =====================================================================
    COURTS, BALL, COSMETICS DATA
    ===================================================================== */
-const NET_H = 5.86, NET_MESH = 3.0, COURT_L = 22.5, INDOOR_SCALE = 1.1;   // the net is twice the old height
+const NET_H = 5.2, NET_MESH = 2.7, COURT_L = 30, INDOOR_SCALE = 1.1;   // a tall net over a long court
 const COURTS_BY_MAP = {
-  indoor: { l: COURT_L * INDOOR_SCALE, half: COURT_L * INDOOR_SCALE / 2, wall: COURT_L * INDOOR_SCALE / 2 + 6, ceil: 18, walls: true },
+  indoor: { l: COURT_L * INDOOR_SCALE, half: COURT_L * INDOOR_SCALE / 2, wall: COURT_L * INDOOR_SCALE / 2 + 13, ceil: 18, walls: true },   // wall = how far you can chase before a ball is out
   beach:  { l: COURT_L, half: COURT_L / 2, wall: COURT_L / 2 + 13, ceil: 80, walls: false },
 };
 const courtDims = () => COURTS_BY_MAP[(S.match && S.match.map) || 'indoor'];
@@ -518,7 +518,7 @@ function drawGym(t, cd) {                           // a clean gym: pale walls, 
   rect(x0, top, x1 - x0, 10, '#b8c1cd'); for (let x = Math.floor(x0 / 4) * 4; x < x1; x += 4) { rect(x, top, 0.2, 10, '#a6b0bd'); if (!ULTRA) rect(x + 1.1, top - 0.3, 1.8, 0.3, isNight ? '#fffbe6' : '#f4f1e2'); }
   rect(x0, -9, x1 - x0, 9, '#d8a86c'); for (let x = Math.floor(x0); x < x1; x += 1.2) line(x, -9, x, 0, 'rgba(120,70,20,.13)', 0.03);
   courtLines(cd, '#ffffff', '#e8864a', '#3b7bd0');
-  for (const s of [-1, 1]) { rect(s < 0 ? x0 : W, 0, s < 0 ? -W - x0 : x1 - W, top, '#c9d1dc'); rect(s * W - (s < 0 ? 0.5 : 0), 0, 0.5, 2.4, '#2f5fd0'); }
+  for (const s of [-1, 1]) { const E = W + 14; rect(s < 0 ? x0 : E, 0, s < 0 ? -E - x0 : x1 - E, top, '#c9d1dc'); rect(s * E - (s < 0 ? 0.5 : 0), 0, 0.5, 2.4, '#2f5fd0'); }
 }
 
 /* =====================================================================

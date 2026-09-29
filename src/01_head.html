@@ -266,15 +266,9 @@ body.touch #chat{width:min(290px,50vw)}
 
 /* stamina: one bar per team, both teams see both (Spike Cross style) */
 #stamina{position:absolute;top:14px;left:50%;transform:translateX(-50%);width:min(820px,96vw);display:flex;justify-content:space-between;pointer-events:none}
-.stamBar{width:min(250px,28vw);position:relative;height:22px;background:rgba(10,14,34,.8);border:2px solid rgba(255,255,255,.35);transform:skewX(-14deg);overflow:hidden}
-.stamBar i{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#ffd23f,#3ecf7a);transition:width .25s}
+.stamBar{width:min(260px,28vw);position:relative;height:12px;background:rgba(10,14,34,.55);transform:skewX(-14deg);overflow:hidden}
+.stamBar i{position:absolute;left:0;top:0;bottom:0;background:#ffffff;transition:width .25s}
 #stamB i{left:auto;right:0}
-.stamBar.high i{background:linear-gradient(90deg,#3ecf7a,#7dffb0)}
-.stamBar.low i{background:linear-gradient(90deg,#ff4d5e,#ff8a1f)}
-.stamBar label,.stamBar span{position:absolute;top:1px;font-size:12px;font-weight:900;font-style:italic;transform:skewX(14deg);text-shadow:0 1px 2px #000}
-.stamBar label{left:10px}.stamBar span{right:10px}
-#stamB label{left:auto;right:10px}#stamB span{right:auto;left:10px}
-.stamBar:before{content:'';position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0 23px,rgba(0,0,0,.35) 23px 25px);z-index:1}
 /* breakthroughs */
 .btcard{--rc:#9aa0a6;position:relative;border:3px solid var(--rc);background:linear-gradient(160deg,rgba(255,255,255,.08),rgba(0,0,0,.35));padding:10px;display:flex;flex-direction:column;gap:6px;text-align:center;color:#fff;box-shadow:0 4px 0 rgba(0,0,0,.35)}
 .btcard .bl{font-size:44px;font-weight:900;font-style:italic;color:var(--rc);line-height:1;text-shadow:0 0 14px var(--rc)}
@@ -303,6 +297,9 @@ body.touch #chat{width:min(290px,50vw)}
 .stat .sd{grid-column:1/-1;font-size:11px;font-weight:700;opacity:.8}
 .stat .pu{color:#d9a8ff;font-weight:900}.dim{opacity:.55}
 .chip{--rc:#999;display:inline-block;border:2px solid var(--rc);padding:3px 8px;margin:0 6px 6px 0;font-size:12px;font-weight:800}.chip b{color:var(--rc);font-style:italic}
+.mchest{position:absolute;width:86px;height:86px;pointer-events:none}
+.mchest.shake{animation:chestShake .95s ease-in-out}
+.mchest.best{filter:drop-shadow(0 0 12px var(--rc))}
 </style>
 </head>
 <body>
@@ -339,7 +336,7 @@ body.touch #chat{width:min(290px,50vw)}
 
   <div id="matchHud" class="hidden">
     <button class="btn red small" id="leaveBtn">LEAVE MATCH</button>
-    <div id="stamina"><div id="stamA" class="stamBar"><i></i><label>BLACK</label><span>100%</span></div><div id="stamB" class="stamBar"><i></i><label>WHITE</label><span>100%</span></div></div>
+    <div id="stamina"><div id="stamA" class="stamBar"><i></i></div><div id="stamB" class="stamBar"><i></i></div></div>
     <div id="score"><div><span id="scoreA">0</span><small>BLACK</small></div><div>-</div><div><span id="scoreB">0</span><small>WHITE</small></div><div id="modeTxt"></div></div>
     <div id="touches"><i></i><i></i><i></i></div>
     <div id="bigMsg"></div>
