@@ -1023,9 +1023,8 @@ const POSES = {
   sit:         P2(-6, 4, 28, 58, 28, 58, 76, -76, 76, -76),
   lie:         P2(0, 6, 150, 20, 150, 20, 4, -10, 4, -10),
   toss:        P2(-4, -16, 160, 0, 15, 6, 0, 0, 0, 0),
-  approach:    P2(34, -22, -62, 12, -70, 16, 64, -92, 24, -48),          // the last step of the run-up: low, both arms thrown back
 };
-const POSE_SNAP = { approach: 26, jumpUp: 22, land: 20, spikeCharge: 26, spikeHit: 32, bump: 20 };
+const POSE_SNAP = { jumpUp: 22, land: 20, spikeCharge: 26, spikeHit: 32, bump: 20 };
 const JERSEY2 = { black: { shirt: '#1d1e25', trim: '#e5484d', shorts: '#15161b', num: '#ffffff', pad: '#d9383f', sock: '#1d1e25' }, white: { shirt: '#eef0f4', trim: '#2b5fd9', shorts: '#e3e6ec', num: '#2b2d35', pad: '#2b2d35', sock: '#f7f7f7' } };
 const HAIRS = [['#f1d27a', '#2a5fe0'], ['#e8843a', '#b85a1c'], ['#3a2a22', '#241812'], ['#dfe3ea', '#9aa3b2'], ['#1c1c24', '#35354a'], ['#c9924a', '#8a5a2a'], ['#f1d27a', '#d9a93a']];
 function lookFor(variant, model, hairIdx = 0) {
@@ -1808,7 +1807,7 @@ function onPress(code) {
   if (P.holding) { if (code === KEYS.toss) doToss(); return; }
   if (P.dive) return;
   if (P.onGround) {
-    if (P.approach || P.cd > 0 || T < (P.landLock || 0)) return;
+    if (P.cd > 0 || T < (P.landLock || 0)) return;
     if (code === KEYS.bump) doBump();
     else if (code === KEYS.groundSet) doGroundSet();
     else if (code === KEYS.dive) doDive();
@@ -1820,15 +1819,8 @@ function onPress(code) {
   }
 }
 function onRelease(code) { if (P.charging && code === KEYS.spike) releaseSpike(); }
-const APPROACH = 0.25;                               // the run-up before every jump: two steps, arms back, then up
 function tryJump() {
-  if (!P.onGround || P.dive || P.approach || T < (P.landLock || 0)) return;
-  if (P.holding) { doJump(); return; }
-  if (P.bumpHold) endBump();
-  P.approach = { t0: T, dir: P.f, stepped: 0 };
-}
-function doJump() {
-  P.approach = null;
+  if (!P.onGround || P.dive || T < (P.landLock || 0)) return;
   P.vy = jumpV(stat('jump')); P.onGround = false; P.airUsed = false;
   jumpFx(P.x, P.y, groundDustColor(), myPurple('jump'));
   P.jumpF = P.f; P.rig.base = P.holding ? 'hold' : 'air';
@@ -2114,12 +2106,6 @@ function updatePlayer(dt) {
     const e = (T - P.dive.t0) / P.dive.dur;
     if (e >= 1) { P.dive = null; P.cd = DIVE_CD; P.rig.pitchTarget = 0; P.diveAnim = 0; P.rig.setPose('idle'); P.rig.base = 'idle'; }
     else { P.vx = P.dive.dir * P.dive.v0 * (1 - e * 0.6); if (myPurple('dive') && Math.random() < 0.8) addPart({ kind: 'dot', x: P.x, y: P.y + 0.5 * PS, vx: -P.vx * 0.05, vy: 0.3, g: 0, drag: 3, life: 0.45, size: 0.16, col: Math.random() < 0.5 ? '#b25cff' : '#d9a8ff' }); }
-  } else if (P.onGround && P.approach) {
-    const e = T - P.approach.t0, d = P.approach.dir;
-    if (e >= APPROACH) { P.vx = d * MOVE_SPEED * speedMult(stat('speed')) * 0.55; doJump(); }
-    else if (e < APPROACH * 0.62) { P.vx = d * MOVE_SPEED * speedMult(stat('speed')) * 1.25; P.moving = true; P.moveDir = d; P.rig.runPhase += dt * 10;   // two quick steps
-      const st = e < APPROACH * 0.31 ? 1 : 2; if (st > P.approach.stepped) { P.approach.stepped = st; puff(P.x, P.y, 2, 0.6, 0.5, groundDustColor()); } }
-    else { P.vx = d * MOVE_SPEED * 0.5; P.moving = false; if (P.rig.anim !== 'approach') P.rig.setPose('approach'); }   // plant, arms thrown back
   } else if (P.onGround) {
     const mv = steering ? 0 : ix;
     if (mv) { P.vx = mv * MOVE_SPEED * speedMult(stat('speed')) * (inRealMatch() ? staminaSpeed(teamStamina(P.team)) : 1) * (P.bumpHold ? 0.55 : 1); P.moveDir = Math.sign(mv); P.moving = true; }
@@ -2423,7 +2409,10 @@ function updateCamera(dt) {
     /* The camera sits between you and the ball (you pull harder), and pulls back the further apart they are.
        It rises to follow a high ball but never drops below the floor framing; sideways it follows you everywhere. */
     const cd = courtDims(), b = matchBall(); const live = b && b.active && !b.held;
-    const bx = live ? b.x : P.x, by = live ? b.y : P.y;
+    let bx = live ? b.x : P.x, by = live ? b.y : P.y;
+    const M = S.match;
+    const server = !M || M.practice ? null : M.state === 'serve' && M.serve ? M.serve.sid : live && b.serve && b.hitType === 'toss' ? b.tossedBy : null;
+    if (server) { const sv = server === SID ? P : remotes.get(server); if (sv) { bx = sv.x; by = sv.y; } }   // until the serve is struck the server pulls the camera, not the ball
     const BP = 0.3;                                                       // the ball's pull: 30%, you 70%
     const needW = Math.max(CAM_MIN_W, Math.abs(bx - P.x) * 0.6 + 12), needH = Math.max(CAM_MIN_H, Math.abs(by - P.y) * 0.6 + 7);
     const want = Math.max(Math.min(VW / needW, VH / needH), Math.min(VW / (2 * cd.wall), VH / 60));   // never further out than the whole hall
@@ -2961,7 +2950,7 @@ function resetToSpawn() {                       // back to your starting spot (m
   const M = S.match; if (!M) return;
   const mates = Object.keys(M.teams[P.team] || {}).sort(); const idx = Math.max(0, mates.indexOf(SID));
   P.x = M.practice ? -4 : spawnX(P.team, idx, mates.length); P.y = 0; P.vx = P.vy = 0; P.onGround = true; P.f = P.team === 'A' ? 1 : -1;
-  P.holding = false; P.serveMode = false; P.serveAim = null; P.dive = null; P.dash = null; P.glide = null; P.charging = false; P.airUsed = false; P.act = null; P.bumpHold = false; P.approach = null; P.swingAt = 0; P.onStairs = false;
+  P.holding = false; P.serveMode = false; P.serveAim = null; P.dive = null; P.dash = null; P.glide = null; P.charging = false; P.airUsed = false; P.act = null; P.bumpHold = false; P.swingAt = 0; P.onStairs = false;
   if (P.rig) { P.rig.base = 'idle'; P.rig.setPose('idle'); P.rig.pitchTarget = 0; }
 }
 async function enterMatch(mid) {
