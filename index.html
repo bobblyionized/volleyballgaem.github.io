@@ -373,6 +373,7 @@ body.touch #chat{width:min(290px,50vw)}
         </div>
         <div class="toggles">
           <div class="tgl" id="playMode">PLAY <button data-pm="online">ONLINE</button><button data-pm="bots">VS BOTS</button></div>
+          <div class="tgl hidden" id="botLevel">LEVEL <button data-bl="easy">EASY</button><button data-bl="medium">MEDIUM</button><button data-bl="hard">HARD</button></div>
           <div class="tgl hidden" id="mapPick">MAP <button data-map="indoor">INDOORS</button><button data-map="beach">BEACH</button></div>
           <div class="tgl" id="lockRow">FRIENDS ONLY <button id="lockToggle">OFF</button></div>
         </div>
@@ -1877,11 +1878,24 @@ function updateBlockLean() {
   const m = worldMouse(); const ang = Math.atan2(m.x - P.x, m.y - (P.y + 1.9 * PS)) * P.f;
   P.blockLean = clamp(ang, -BLOCK_LEAN, BLOCK_LEAN); P.rig.pitchTarget = P.blockLean * 0.8;
 }
+/* Blocks by angle. Where the ball meets the hands, and which way the blocker leans:
+   the front of the hands while leaning in = kill block; the very top of the hands = a wipe that flies up and back
+   (off a hard spike it sails out - a free point unless someone chases it down); leaning back, or the ball on the
+   back of the hands = a one-touch; blocking while turned away from the net = a wipe straight out, no saving it. */
+function blockTouch(b, bx, by, f, nd, lean, L) {
+  const sp = Math.hypot(b.vx, b.vy);
+  if (f !== nd) return { vx: -nd * Math.max(24, sp * 0.8 + 10), vy: 14, g: 0.6, kind: 'WIPE' };
+  const hx = bx + f * (0.3 + lean * 0.9) * PS, hy = by + 2.25 * PS;
+  const fwd = (b.x - hx) * nd, up = b.y - hy;
+  if (up > 0.15 * PS && up > Math.abs(fwd) * 0.6) return { vx: -nd * (sp * 0.55 + 1), vy: sp * 0.35 + 5, g: 1, kind: 'WIPE' };
+  if (fwd >= -0.05 && lean > 0.08) { const r = blockSolve(b, bx, nd, clamp(lean / BLOCK_LEAN, 0.3, 1), L); r.kind = sp >= 12 ? 'KILL BLOCK' : ''; return r; }
+  const r = blockSolve(b, bx, nd, -1, L); r.kind = ''; return r;
+}
+const blockNetDir = () => faceNet() ? (P.team === 'A' ? 1 : -1) : netFrom(P.x);
 function blockContact() {
   P.blockHit = true; camKick(-0.03, 2.6);
-  const tz = clamp(P.blockLean / BLOCK_LEAN, -1, 1);
-  const r = blockSolve(B, P.x, netDir(), tz, stat('block'));
-  hitBall('block', r.vx, r.vy, r.g);
+  const r = blockTouch(B, P.x, P.y, P.f, blockNetDir(), P.blockLean, stat('block'));
+  hitBall('block', r.vx, r.vy, r.g); if (r.kind) showBallMsg(r.kind, B);
   if (myPurple('block')) ringFx(B.x, B.y, '#b25cff', 0.3, 2.4, 0.35, 0.12); else ringFx(B.x, B.y, '#ffffff', 0.3, 1.8, 0.3, 0.08);
 }
 const FULL_T = 0.5625;
@@ -2142,7 +2156,7 @@ function updateBalls(dt) {
     if (!ULTRA && (b.pu & PU.set) && (b.hitType === 'set' || b.hitType === 'bump') && T - (b.hitAtT || 0) < 1.2 && !b.landed) addPart({ kind: 'dot', x: b.x, y: b.y, vx: 0, vy: 0, g: 0, drag: 0, life: 0.5, size: BALL_R * 0.7, col: Math.random() < 0.5 ? '#b25cff' : '#e0b8ff' });   // Set 100: a purple trail
     if (b.skin === 'fire' && !ULTRA && Math.hypot(b.vx, b.vy) > 3 && Math.random() < 0.6) addPart({ kind: 'dot', x: b.x, y: b.y, vx: -b.vx * 0.1, vy: 0.6, g: -1, drag: 2, life: 0.35, size: 0.1, col: Math.random() < 0.5 ? '#ffb02a' : '#ff5a1f' });
   }
-  if (T < P.blockUntil && !P.blockHit && ballReach(highX() + P.f * P.blockLean * 0.9 * PS, highY() + 0.3 * PS, 1.35 * PS, 0.55, true) && B.hitter !== SID && B.vx * netDir() < 0 && Math.abs(B.x) < NET_GAP + 3.2) blockContact();   // blocks reach over the net and lean with you
+  if (T < P.blockUntil && !P.blockHit && ballReach(highX() + P.f * P.blockLean * 0.9 * PS, highY() + 0.3 * PS, 1.35 * PS, 0.55, true) && B.hitter !== SID && B.vx * blockNetDir() < 0 && Math.abs(B.x) < NET_GAP + 3.2) blockContact();   // blocks reach over the net and lean with you
   if (P.dive && !P.dive.hit && ballReach(P.x + P.dive.dir * 1.0 * PS, P.y + 0.6 * PS, 1.8 * PS)) diveContact();
 }
 /* ---- "TOO LOW" popup at the ball ---- */
@@ -2520,8 +2534,7 @@ function renderStats() {
     d.innerHTML = `<div class="sn">${name}</div>
       <div class="sbar"><i style="width:${Math.min(100, base)}%"></i><em style="left:${Math.min(100, base)}%;width:${Math.max(0, Math.min(100, eff) - Math.min(100, base))}%"></em><s style="left:50%"></s></div>
       <div class="sv"><b>${base}/${STAT_BUY_MAX}</b>${bonus ? ` <span class="bonus">(+${bonus})</span>` : ''}<small>acts as ${eff}</small></div>
-      <div class="sb"><button data-k="${k}" data-n="1" ${base >= STAT_BUY_MAX || me.guest ? 'disabled' : ''}>+1 $${STAT_COST}</button><button data-k="${k}" data-n="5" ${base >= STAT_BUY_MAX || me.guest ? 'disabled' : ''}>+5</button></div>
-      <div class="sd">${desc}${eff >= 100 ? ` <span class="pu">100 reached: ${purple} unlocked</span>` : ` <span class="dim">100: ${purple}</span>`}</div>`;
+      <div class="sb"><button data-k="${k}" data-n="1" ${base >= STAT_BUY_MAX || me.guest ? 'disabled' : ''}>+1 $${STAT_COST}</button><button data-k="${k}" data-n="5" ${base >= STAT_BUY_MAX || me.guest ? 'disabled' : ''}>+5</button></div>`;
     list.appendChild(d);
   }
   const bts = btEquipped(); $('#statBts').innerHTML = bts.length ? bts.map(bt => `<span class="chip" style="--rc:${BT_COLOR[bt.r]}"><b>${bt.r}</b> ${esc(btLabel(bt))}</span>`).join('') : '<span class="dim">No breakthroughs equipped.</span>';
@@ -2688,6 +2701,7 @@ let selMode = '2v2', botPlay = 'online', practiceMap = 'indoor', friendsLock = f
 const MODE_CAP = { '2v2': 2, '3v3': 3, '6v6': 6, practice: 6 };
 $$('#modeCards .mode').forEach(b => b.onclick = () => { selMode = b.dataset.mode; renderPlay(); });
 $$('#playMode button').forEach(b => b.onclick = () => { botPlay = b.dataset.pm; renderPlay(); });
+$$('#botLevel button').forEach(b => b.onclick = () => { botLevel = b.dataset.bl; renderPlay(); });
 $$('#mapPick button').forEach(b => b.onclick = () => { practiceMap = b.dataset.map; renderPlay(); });
 $('#lockToggle').onclick = () => { friendsLock = !friendsLock; renderPlay(); };
 $('#teamInvite').onclick = () => showSection('social');
@@ -2700,6 +2714,7 @@ function renderPlay() {
   for (const m of ['2v2', '3v3', '6v6']) { const el = $('#mc' + m); if (el) el.textContent = (m === '2v2' ? 'BEACH' : 'INDOOR') + (QCOUNT[m] ? ` · ${QCOUNT[m]} IN QUEUE` : ''); }
   const prac = selMode === 'practice';
   $('#playMode').classList.toggle('hidden', prac); $$('#playMode button').forEach(b => b.classList.toggle('on', b.dataset.pm === botPlay));
+  $('#botLevel').classList.toggle('hidden', prac || botPlay !== 'bots'); $$('#botLevel button').forEach(b => b.classList.toggle('on', b.dataset.bl === botLevel));
   $('#mapPick').classList.toggle('hidden', !prac); $$('#mapPick button').forEach(b => b.classList.toggle('on', b.dataset.map === practiceMap));
   $('#lockRow').classList.toggle('hidden', prac || botPlay === 'bots'); $('#lockToggle').textContent = friendsLock ? 'ON' : 'OFF'; $('#lockToggle').classList.toggle('on', friendsLock);
   const mem = partyMembers(); const list = $('#teamList'); list.innerHTML = '';
@@ -2973,11 +2988,20 @@ function updateMatchHud() {
 const BOTS = [];
 const BOT_NAMES = [['Bob', 'boy'], ['Greg', 'boy'], ['Emily', 'boy'], ['Dave', 'boy'], ['Sarah', 'boy'], ['Karen', 'boy'], ['Steve', 'boy'], ['Linda', 'boy'], ['Kevin', 'boy'], ['Jenny', 'boy'], ['Frank', 'boy'], ['Nancy', 'boy']];
 const BOT_REACH_G = 1.6 * PS, BOT_REACH_A = 1.7 * PS;
-const BOT_JV = jumpV(BOT_LVL), BOT_JH = BOT_JV * BOT_JV / (2 * G);     // bots play at level 40 in every stat
+let botLevel = 'easy';
+const BOT_LEVELS = { easy: 40, medium: 50, hard: 50 }, BOT_BLOCK_MISS = { easy: 0.45, medium: 0.3, hard: 0.18 };
+function botStats() {                              // easy: 40 everywhere, medium: 50 everywhere, hard: 50 with one or two stats at 100
+  const st = {}; for (const k of STAT_KEYS) st[k] = BOT_LEVELS[botLevel];
+  if (botLevel === 'hard') STAT_KEYS.slice().sort(() => Math.random() - 0.5).slice(0, Math.random() < 0.5 ? 1 : 2).forEach(k => { st[k] = 100; });
+  return st;
+}
+const setHOf = bot => bot.jh * 0.8 + BOT_HIGH, hitHOf = bot => bot.jh * 0.92 + BOT_HIGH;
+const myHitH = () => jumpV(stat('jump')) ** 2 / (2 * G) * 0.92 + 1.92 * PS + spikeReach(stat('spike'));
 const BOT_HIGH = 2.0 * PS, BOT_LOW = 1.05 * PS;
 function makeBot(id, name, model, team, idx, n) {
   const rig = new Rig2D(TEAM_VARIANT[team], 'boy', 1 + (idx + (team === 'B' ? 3 : 0)) % (HAIRS.length - 1)); rig.ready = true;   // same athlete, different hair so you can tell them apart
   const bot = { id, name, model, team, idx, n, rig, x: spawnX(team, idx, n), y: 0, vx: 0, vy: 0, onGround: true, f: -teamSide(team), target: null, role: 'player', plan: null, blockUntil: 0, blockTilt: -1, spike: null, lastHitT: -9, serveAt: 0, coin: 0, base: 0 };
+  bot.st = botStats(); bot.jv = jumpV(bot.st.jump); bot.jh = bot.jv * bot.jv / (2 * G);
   bot.base = bot.x; rig.place(bot.x, 0, bot.f, true); rig.snap();
   remotes.set(id, { bot: true, rig, name, data: { team, name, f: bot.f, g: 1 }, x: bot.x, y: 0 });
   return bot;
@@ -2992,7 +3016,7 @@ function startBotMatch(size) {
   for (const [id, nm, md, team] of spec) { const mates = Object.keys(teams[team]).sort(); BOTS.push(makeBot(id, nm, md, team, mates.indexOf(id), mates.length)); }
   if (size >= 3) for (const team of ['A', 'B']) { const first = BOTS.find(x => x.team === team); if (first) first.role = 'setter'; }
   const M = S.match; const t = M.serve.team; const members = Object.keys(M.teams[t]).sort(); M.serve.sid = members[0]; M.serveIdx[t] = 0;
-  botsOnServe(); $('#modeTxt').textContent = M.mode.toUpperCase() + ' vs BOTS';
+  botsOnServe(); $('#modeTxt').textContent = M.mode.toUpperCase() + ' vs ' + botLevel.toUpperCase() + ' BOTS';
   toast('Bot match: ' + (size === 2 ? 'beach' : 'indoor') + ' court', 'ok');
 }
 function predictBall(b, opts = {}) {
@@ -3002,7 +3026,7 @@ function predictBall(b, opts = {}) {
 }
 function botStep(bot, dt) {
   const cd = courtDims(); const s = teamSide(bot.team);
-  const spd = MOVE_SPEED * speedMult(BOT_LVL) * staminaSpeed(teamStamina(bot.team));
+  const spd = MOVE_SPEED * speedMult(bot.st.speed) * staminaSpeed(teamStamina(bot.team));
   if (bot.target !== null && bot.onGround) {
     const dx = bot.target - bot.x, d = Math.abs(dx); const top = bot.role === 'setter' || (bot.plan && bot.plan.startsWith('set')) ? spd * 1.3 : spd;
     bot.vx = d > 0.1 ? Math.sign(dx) * Math.min(top, d / dt) : 0;
@@ -3015,7 +3039,7 @@ function botStep(bot, dt) {
   bot.rig.moveSpeed = bot.onGround && bot.rig.anim === 'idle' ? Math.abs(bot.vx) : 0; bot.rig.place(bot.x, bot.y, bot.f, bot.onGround); bot.rig.update(dt, T);
   if (MATCH_NET && Math.abs(bot.x) < NET_GAP + 0.3) MATCH_NET.touchBody(bot.x, bot.y, BODY_H, bot.x < 0 ? -1 : 1);
 }
-function botJump(bot, straight = false) { if (!bot.onGround) return; if (straight) bot.vx = 0; bot.vy = BOT_JV; bot.onGround = false; bot.rig.impact(0.14); bot.rig.base = 'air'; bot.rig.setPose('jumpUp', T + 0.18); jumpFx(bot.x, 0, groundDustColor()); }
+function botJump(bot, straight = false) { if (!bot.onGround) return; if (straight) bot.vx = 0; bot.vy = bot.jv; bot.onGround = false; bot.rig.impact(0.14); bot.rig.base = 'air'; bot.rig.setPose('jumpUp', T + 0.18); jumpFx(bot.x, 0, groundDustColor()); }
 function botHit(bot, type, vx, vy, g = 1) {
   const b = matchBall(); if (!b) return;
   b.vx = vx; b.vy = vy; b.g = g; b.seq++; b.t = snow(); b.held = null; b.active = true; b.frozen = false; b.pf = null; b.acc = 0; b.netSide = 0; b.pu = 0;
@@ -3050,7 +3074,7 @@ function botSpike(bot) {
   const b = matchBall(); if (!bot.spike) botPickSpike(bot);
   const sp = bot.spike; bot.spike = null; const fwd = bot.f;
   if (sp.kind === 'tip') { const pitch = 32 * D, s = 7; botHit(bot, 'tip', fwd * Math.cos(pitch) * s, Math.sin(pitch) * s, 1); return; }
-  const r = spikeSolve(b.x, b.y, fwd, sp.tz, sp.c, spikeMult(BOT_LVL));   // the player's spike at level 40
+  const r = spikeSolve(b.x, b.y, fwd, sp.tz, sp.c, spikeMult(bot.st.spike));   // exactly the player's spike, at the bot's level
   botHit(bot, 'spike', r.vx, r.vy, r.g); if (r.lob) showBallMsg('TOO LOW', b);
 }
 function botsOnServe() {
@@ -3067,7 +3091,7 @@ function botServe(bot) {
   mwrite('state', 'rally');
 }
 /* a bot pass: what it costs the team and how far off it lands when they are tired */
-function botPass(bot, kind) { const b = matchBall(); const st = payForPass(b, kind, bot.team, BOT_LVL); return scatterFor(st, BOT_LVL); }
+function botPass(bot, kind) { const b = matchBall(); const st = payForPass(b, kind, bot.team, bot.st.set); return scatterFor(st, bot.st.set); }
 function planTeam(team, bots) {
   const M = S.match, b = matchBall(); if (!b) return;
   const cd = courtDims(); const s = teamSide(team); const human = humanOnTeam(team);
@@ -3076,7 +3100,6 @@ function planTeam(team, bots) {
   const size = bots.length + (human ? 1 : 0);
   const setter = size >= 3 ? (bots.find(x => x.role === 'setter') || bots[0]) : null;
   const spots = attackSpots(team);
-  const setH = BOT_JH * 0.8 + BOT_HIGH, hitH = BOT_JH * 0.92 + BOT_HIGH;   // the heights a bot meets the ball at for a jump set and a spike
   if (!b.active || M.state !== 'rally') { for (const bot of bots) bot.target = bot.base; return; }
   if (incoming && oursTouches < 3) {
     if (oursTouches === 0) {                                                                            // RECEIVE
@@ -3116,29 +3139,31 @@ function planTeam(team, bots) {
         if (bot.id === b.hitter && bots.length <= 2) { bot.target = spots.front; bot.plan = 'hitter'; continue; }
         if (k < 3) { bot.target = spots[order[k++]]; bot.plan = 'hitter'; } else { bot.target = bot.base; bot.plan = 'wait'; }
       }
+      const setH = setHOf(st);
       const hi = predictBall(b, { height: setH }).atH;
       const at = hi || predictBall(b, { height: BOT_LOW * 2 }).atH; const under = at ? at.x : pred.land.x;
       if (st.onGround) st.target = under + s * 0.35;
-      const tRise = BOT_JV / G * 0.75;
+      const tRise = st.jv / G * 0.75;
       const wantJump = hi && Math.abs(st.x - (under + s * 0.35)) < 0.7 && hi.t < tRise && b.y > setH - 0.5;
       if (wantJump && st.onGround) botJump(st, true);
       if (botMayTouch(st) && botReach(st, !st.onGround) && (!hi || !st.onGround || (b.vy < 0 && b.y < BOT_HIGH * 1.3))) {
         const tg = Math.random() < 0.5 ? b.x : s * (NET_GAP + 1.6);            // bots set straight up, or just off the net - the hitter runs under it
         const sc = botPass(st, 'set');
-        const v = setAim(b.x, b.y, tg + randn() * sc, hitH + 2 + randn() * sc * 0.4, 1, BOT_LVL); botHit(st, 'set', v.vx, v.vy, v.g);
+        const hb = pick === 'human' ? null : bots.find(x => x.id === pick); const aimH = pick === 'human' ? myHitH() : hitHOf(hb || st);   // as high as the hitter can reach - your Jump when it is your set
+        const v = setAim(b.x, b.y, tg + randn() * sc, aimH + 2 + randn() * sc * 0.4, 1, st.st.set); botHit(st, 'set', v.vx, v.vy, v.g);
         st.plan = 'setter'; st.target = setterSpot(team);
       }
     } else {                                                                                            // ATTACK
-      const spikeAt = predictBall(b, { height: hitH }).atH;
-      const aim = spikeAt ? spikeAt.x : pred.land.x;
       const cands = bots.filter(x => x.id !== b.hitter && x !== setter);
+      const spikeAt = predictBall(b, { height: hitHOf(cands[0] || bots[0]) }).atH;
+      const aim = spikeAt ? spikeAt.x : pred.land.x;
       const hitter = cands.length ? cands.reduce((a, x) => Math.abs(x.x - aim) < Math.abs(a.x - aim) ? x : a, cands[0]) : null;
       for (const bot of bots) if (bot !== hitter) { bot.target = bot === setter ? setterSpot(team) : bot.base; bot.plan = 'wait'; }
       if (hitter) {
         hitter.plan = 'attack'; hitter.target = aim + s * 0.6;
         if (hitter.onGround) hitter.spike = null;
         const tLeft = spikeAt ? spikeAt.t : pred.land.t;
-        if (hitter.onGround && spikeAt && tLeft < BOT_JV / G * 0.95 && Math.abs(hitter.x - (aim + s * 0.6)) < 1.6) { botPickSpike(hitter); botJump(hitter); }
+        if (hitter.onGround && spikeAt && tLeft < hitter.jv / G * 0.95 && Math.abs(hitter.x - (aim + s * 0.6)) < 1.6) { botPickSpike(hitter); botJump(hitter); }
         if (!hitter.onGround && botReach(hitter, true) && botMayTouch(hitter) && b.vy < 2) botSpike(hitter);
         else if (hitter.onGround && !spikeAt && botReach(hitter, false) && botMayTouch(hitter) && b.y < 1.7 * PS) { const v = launchTo(b.x, b.y, -s * 5, 0, Math.max(NET_H + 2.5, b.y + 3), BALL_G * BUMP_G); botHit(hitter, 'bump', v.x, v.y, BUMP_G); }   // the set never got up: bump it over
       }
@@ -3155,7 +3180,7 @@ function planTeam(team, bots) {
       if (cands.length) blocker = cands[0];
       if (blocker) {
         blocker.plan = 'block'; blocker.target = s * (NET_GAP + 0.15);
-        if (attacker && attacker.up && blocker.onGround && Math.abs(blocker.x) < 2.2) { blocker.blockTilt = (size <= 2 && Math.random() < 0.5) ? 1 : -1; blocker.blockMiss = Math.random() < 0.45; botJump(blocker, true); blocker.blockUntil = T + 1.3; blocker.rig.base = 'block'; blocker.rig.setPose('block'); }
+        if (attacker && attacker.up && blocker.onGround && Math.abs(blocker.x) < 2.2) { blocker.blockTilt = (size <= 2 && Math.random() < 0.5) ? 1 : -1; blocker.blockMiss = Math.random() < BOT_BLOCK_MISS[botLevel]; botJump(blocker, true); blocker.blockUntil = T + 1.3; blocker.rig.base = 'block'; blocker.rig.setPose('block'); }
       }
     }
     for (const bot of bots) {
@@ -3173,8 +3198,8 @@ function botBlockContacts() {
     const s = teamSide(bot.team);
     if (bot.onGround || T >= bot.blockUntil || bot.blockMiss || b.hitter === bot.id || b.vx * s <= 0 || b.x * s > 0.9 || b.x * s < -1.3) continue;
     if (Math.hypot(b.x - (bot.x + bot.f * 0.3 * PS), b.y - (bot.y + 2.3 * PS)) > 1.2 * PS || b.y < NET_H - 0.3) continue;
-    const r = blockSolve(b, bot.x, -s, bot.blockTilt || -1, BOT_LVL);
-    botHit(bot, 'block', r.vx, r.vy, r.g); bot.blockUntil = 0;
+    const r = blockTouch(b, bot.x, bot.y, bot.f, -s, (bot.blockTilt || -1) * 0.3, bot.st.block);   // the same block a player makes
+    botHit(bot, 'block', r.vx, r.vy, r.g); bot.blockUntil = 0; if (r.kind) showBallMsg(r.kind, b);
   }
 }
 function updateBots(dt) {
