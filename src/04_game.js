@@ -19,7 +19,7 @@ const STAT_INFO = {
   spike: ['Spike', 'Harder spikes, hit from higher. 50 = the spike as it is now.', 'a purple spike ring'],
   speed: ['Speed', 'Run faster. 35 = today\'s speed.', 'purple footsteps'],
   dive: ['Dive', 'Dive further. 50 = today\'s dive, 100 crosses the whole court.', 'a purple dive trail'],
-  set: ['Set', 'Passing: bumps and sets land closer to the cursor and cost your team less stamina.', 'a purple trail on your sets and bumps'],
+  set: ['Set', 'Passing power and control: sets and bumps can go higher and faster (no limit at 100), land closer to the cursor and cost your team less stamina.', 'a purple trail on your sets and bumps'],
   block: ['Block', 'Floatier one-touch blocks and faster kill blocks. 50 = today\'s block.', 'purple block flashes'],
   jump: ['Jump', 'Jump higher. 50 = today\'s jump, 100 = twice as high.', 'a purple jump ring'],
 };
@@ -199,22 +199,30 @@ function tryAct() {
   }
 }
 /* Bumps go to the cursor too: up over it, then down to around it. Fresh legs = right on it, tired = off target. */
+/* How high and how fast a pass may go, from the Set stat. 25 plays like the old fixed limits; the limits open
+   up toward 100, where there are none (as high as the gym allows, as fast as you point). */
+const passOpen = L => L >= 100 ? 1 : clamp((L - 25) / 75, 0, 1) ** 1.5;
+const setTopFor = L => L >= 100 ? 1e9 : L <= 25 ? NET_H * lerp(2.0, 2.5, L / 25) : NET_H * (2.5 + 4.5 * passOpen(L));
+const setSpeedFor = L => L >= 100 ? 1e9 : L <= 25 ? lerp(9, 12, L / 25) : 12 + 28 * passOpen(L);
+const bumpTopFor = L => L >= 100 ? 1e9 : L <= 25 ? NET_H * lerp(1.8, 2.2, L / 25) : NET_H * (2.2 + 4.5 * passOpen(L));
+const bumpSpeedFor = L => L >= 100 ? 1e9 : L <= 25 ? lerp(7.5, 10, L / 25) : 10 + 28 * passOpen(L);
 function bumpToCursor(st) {
   const m = worldMouse(); const sc = scatterFor(st, stat('set'));
   const tx = m.x + randn() * sc, ty = Math.max(0.8, m.y + randn() * sc * 0.3);
-  const apex = Math.min(ceilY() - 0.8, Math.max(ty, B.y) + 2.8 * PS);
-  const v = launchTo(B.x, B.y, tx, ty, apex, BALL_G * BUMP_G); hitBall('bump', v.x, v.y, BUMP_G);
+  const L = stat('set'); const apex = Math.min(ceilY() - 0.8, bumpTopFor(L), Math.max(ty, B.y) + 2.8 * PS);
+  const v = launchTo(B.x, B.y, tx, Math.min(ty, apex - 0.4), apex, BALL_G * BUMP_G); const vmax = bumpSpeedFor(L);
+  hitBall('bump', clamp(v.x, -vmax, vmax), v.y, BUMP_G);                  // past its limit a weak passer's bump just falls short
 }
 /* Sets go to the cursor: the ball peaks where you point (never above 2.5 nets, never toward the net).
    Point level with yourself for a quicker, flatter set; point high for a slow, floaty one. */
-function setAim(bx, by, mx, my, g0 = 1) {
-  const top = Math.min(SET_TOP(), ceilY() - 0.6);
+function setAim(bx, by, mx, my, g0 = 1, L = stat('set')) {
+  const top = Math.min(setTopFor(L), ceilY() - 0.6);
   const dx = mx - bx;
   const apex = clamp(my, by + 1.6, top);
   const ang = Math.atan2(Math.max(0, my - by), Math.abs(dx) + 0.01) / (Math.PI / 2);
   const g = g0 * lerp(1.1, 0.72, clamp(ang, 0, 1));
   const gg = BALL_G * g; const vy = Math.sqrt(2 * gg * (apex - by)); const tUp = vy / gg;
-  let vx = clamp(dx / tUp, -12, 12);                                         // sideways, at a pace you can read
+  const vmax = setSpeedFor(L); let vx = clamp(dx / tUp, -vmax, vmax);          // sideways: faster the better you set
   const nd = netFrom(bx); if (vx * nd > 0) {                                 // toward the net: fine, but it has to come down on your side
     const tAll = tUp + Math.sqrt(2 * Math.max(0.1, apex - BALL_R) / gg); const room = Math.max(0, Math.abs(bx) - 0.9);
     vx = nd * Math.min(Math.abs(vx), room / tAll);
@@ -394,6 +402,8 @@ function updatePlayer(dt) {
     const mv = steering || P.emote ? 0 : ix;
     if (mv) { P.vx = mv * MOVE_SPEED * speedMult(stat('speed')) * (inRealMatch() ? staminaSpeed(teamStamina(P.team)) : 1); P.moveDir = Math.sign(mv); P.moving = true; }
     else { P.vx = 0; P.moving = false; }
+  } else if (ix && !steering) {                                             // in the air you can still steer, a little slower than you run
+    const air = ix * MOVE_SPEED * speedMult(stat('speed')) * 0.8; P.vx += (air - P.vx) * smoothT(7, dt);
   }
   if (steering) { const want = clamp(ix * P.f, -1, 1); P.serveAim += (want - P.serveAim) * smoothT(8, dt); }
   for (const f of FX_LIST) {
@@ -1487,7 +1497,7 @@ function planTeam(team, bots) {
       if (botMayTouch(st) && botReach(st, !st.onGround) && (!hi || !st.onGround || (b.vy < 0 && b.y < BOT_HIGH * 1.3))) {
         const tg = Math.random() < 0.5 ? b.x : s * (NET_GAP + 1.6);            // bots set straight up, or just off the net - the hitter runs under it
         const sc = botPass(st, 'set');
-        const v = setAim(b.x, b.y, tg + randn() * sc, hitH + 2 + randn() * sc * 0.4); botHit(st, 'set', v.vx, v.vy, v.g);
+        const v = setAim(b.x, b.y, tg + randn() * sc, hitH + 2 + randn() * sc * 0.4, 1, BOT_LVL); botHit(st, 'set', v.vx, v.vy, v.g);
         st.plan = 'setter'; st.target = setterSpot(team);
       }
     } else {                                                                                            // ATTACK
@@ -1612,7 +1622,7 @@ function render(dt) {
   // serve aim
   if (P.holding && P.serveAim !== null) { const sx = toSX(P.x + P.f * 0.3), sy = toSY(P.y) + 16; C.fillStyle = 'rgba(255,255,255,.9)'; for (const d of [-1, 1]) { C.beginPath(); C.moveTo(sx + d * 58, sy); C.lineTo(sx + d * 40, sy - 10); C.lineTo(sx + d * 40, sy + 10); C.closePath(); C.fill(); } C.fillRect(sx - 40, sy - 3, 80, 6); C.beginPath(); C.arc(sx + P.f * P.serveAim * 44, sy, 9, 0, TAU); C.fillStyle = '#e5484d'; C.fill(); C.strokeStyle = '#000'; C.lineWidth = 2; C.stroke(); }
   // set aim: the peak your set would reach from here (dotted arc), capped at 2.5 nets
-  if (!uiOpen() && !P.holding && M) { const m = worldMouse(); const top = Math.min(SET_TOP(), ceilY() - 0.6); const cy = Math.min(m.y, top); const sx = toSX(m.x), sy = toSY(cy); if (m.y > top) { C.setLineDash([4, 5]); C.strokeStyle = 'rgba(255,255,255,.35)'; C.lineWidth = 1.5; C.beginPath(); C.moveTo(sx, toSY(m.y)); C.lineTo(sx, sy); C.stroke(); C.setLineDash([]); } C.beginPath(); C.arc(sx, sy, 5, 0, TAU); C.strokeStyle = 'rgba(255,255,255,.55)'; C.lineWidth = 2; C.stroke(); }
+  if (!uiOpen() && !P.holding && M) { const m = worldMouse(); const top = Math.min(setTopFor(stat('set')), ceilY() - 0.6); const cy = Math.min(m.y, top); const sx = toSX(m.x), sy = toSY(cy); if (m.y > top) { C.setLineDash([4, 5]); C.strokeStyle = 'rgba(255,255,255,.35)'; C.lineWidth = 1.5; C.beginPath(); C.moveTo(sx, toSY(m.y)); C.lineTo(sx, sy); C.stroke(); C.setLineDash([]); } C.beginPath(); C.arc(sx, sy, 5, 0, TAU); C.strokeStyle = 'rgba(255,255,255,.55)'; C.lineWidth = 2; C.stroke(); }
   // TOO LOW
   if (ballMsg) { if (performance.now() > ballMsg.until) ballMsg = null; else { const bx = ballMsg.b && ballMsg.b.active ? ballMsg.b.x : ballMsg.x, by = ballMsg.b && ballMsg.b.active ? ballMsg.b.y : ballMsg.y; const sx = toSX(bx), sy = toSY(by + 0.8); C.font = '900 13px Montserrat, Arial'; const w = C.measureText(ballMsg.text).width + 16; rrScreen(sx - w / 2, sy - 22, w, 22, 5, '#e5484d'); C.fillStyle = '#fff'; C.textAlign = 'center'; C.textBaseline = 'middle'; C.fillText(ballMsg.text, sx, sy - 11); } }
   // balls above the view: a marker on the top edge
