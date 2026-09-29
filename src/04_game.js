@@ -78,6 +78,16 @@ function makeBall(id, sceneName, skin = 'default') {
 }
 function removeBall(id) { const b = balls.get(id); if (!b) return; balls.delete(id); if (B === b) B = null; }
 function acrossNet(ax, bx) { for (const n of netsFor()) if ((ax - n.x) * (bx - n.x) < 0) return true; return false; }
+function blockReach() {                          // the block hitbox: a column from your feet to the top of your hands, leaning with you
+  const hx = P.x + P.f * (0.3 + P.blockLean * 0.9) * PS, top = P.y + 2.25 * PS + 0.35 * PS, hw = 0.7 * PS; let best = null, bd = 1e9;
+  for (const b of balls.values()) {
+    if (b.scene !== S.scene || !b.active || b.held || b.frozen || b.hitter === SID) continue;
+    if (b.y < P.y - BALL_R || b.y > top + BALL_R) continue;
+    const t = clamp((b.y - P.y) / Math.max(0.1, top - P.y), 0, 1); const cx = P.x + (hx - P.x) * t;   // the column tilts from the feet to the hands
+    const d = Math.abs(b.x - cx); if (d > hw + BALL_R || d >= bd) continue; bd = d; best = b;
+  }
+  if (best) B = best; return !!best;
+}
 function ballReach(cx, cy, r, vScale = 1, allowAcross = false) {
   let best = null, bd = r;
   for (const b of balls.values()) {
@@ -530,7 +540,7 @@ function updateBalls(dt) {
     if (!ULTRA && (b.pu & PU.set) && (b.hitType === 'set' || b.hitType === 'bump') && T - (b.hitAtT || 0) < 1.2 && !b.landed) addPart({ kind: 'dot', x: b.x, y: b.y, vx: 0, vy: 0, g: 0, drag: 0, life: 0.5, size: BALL_R * 0.7, col: Math.random() < 0.5 ? '#b25cff' : '#e0b8ff' });   // Set 100: a purple trail
     if (b.skin === 'fire' && !ULTRA && Math.hypot(b.vx, b.vy) > 3 && Math.random() < 0.6) addPart({ kind: 'dot', x: b.x, y: b.y, vx: -b.vx * 0.1, vy: 0.6, g: -1, drag: 2, life: 0.35, size: 0.1, col: Math.random() < 0.5 ? '#ffb02a' : '#ff5a1f' });
   }
-  if (T < P.blockUntil && !P.blockHit && ballReach(highX() + P.f * P.blockLean * 0.9 * PS, highY() + 0.3 * PS, 1.35 * PS, 0.55, true) && B.hitter !== SID && B.vx * blockNetDir() < 0 && Math.abs(B.x) < NET_GAP + 3.2) blockContact();   // blocks reach over the net and lean with you
+  if (T < P.blockUntil && !P.blockHit && blockReach() && B.hitter !== SID && B.vx * blockNetDir() < 0 && Math.abs(B.x) < NET_GAP + 3.2) blockContact();   // blocks reach over the net and lean with you
   if (P.dive && !P.dive.hit && ballReach(P.x + P.dive.dir * 1.0 * PS, P.y + 0.6 * PS, 1.8 * PS)) diveContact();
 }
 /* ---- "TOO LOW" popup at the ball ---- */
@@ -1610,7 +1620,7 @@ function botBlockContacts() {
   for (const bot of BOTS) {
     const s = teamSide(bot.team);
     if (bot.onGround || T >= bot.blockUntil || bot.blockMiss || b.hitter === bot.id || b.vx * s <= 0 || b.x * s > 0.9 || b.x * s < -1.3) continue;
-    if (Math.hypot(b.x - (bot.x + bot.f * 0.3 * PS), b.y - (bot.y + 2.3 * PS)) > 1.2 * PS || b.y < NET_H - 0.3) continue;
+    const top = bot.y + 2.6 * PS; if (b.y < bot.y - BALL_R || b.y > top + BALL_R) continue; const t = clamp((b.y - bot.y) / (top - bot.y), 0, 1); if (Math.abs(b.x - (bot.x + bot.f * 0.3 * PS * t)) > 0.7 * PS + BALL_R) continue;   // feet to hands, like a player's block
     const r = blockTouch(b, bot.x, bot.y, bot.f, -s, (bot.blockTilt || -1) * 0.3, bot.st.block);   // the same block a player makes
     botHit(bot, 'block', r.vx, r.vy, r.g); bot.blockUntil = 0; if (r.kind) showBallMsg(r.kind, b);
   }
