@@ -180,7 +180,7 @@ applyKeys();
    The main menu is the home screen: PLAY (queue), INVENTORY, SHOP, QUESTS, FRIENDS & PARTY, SETTINGS.
    In a match, M opens it over the court (and closes it again). */
 let menuSec = 'play';
-const SECTIONS = ['play', 'stats', 'inventory', 'shop', 'quests', 'social', 'settings'];
+const SECTIONS = ['play', 'stats', 'inventory', 'shop', 'social', 'settings'];
 function menuOpen() { return !$('#menu').classList.contains('hidden'); }
 const inAMatch = () => S.scene === 'match' && !!S.match;
 function openMenu(sec) {

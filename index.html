@@ -230,14 +230,6 @@ body.touch #chat{width:min(290px,50vw)}
 #shopDealer{display:flex;align-items:center;gap:12px;background:linear-gradient(90deg,rgba(255,138,31,.25),rgba(255,138,31,0));border-radius:3px;padding:8px 12px;margin-bottom:10px}
 #shopDealer b{font-size:18px;font-weight:900;font-style:italic;display:block}
 #shopDealer span{font-size:12px;font-weight:700;opacity:.8}
-/* quests */
-.quest{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,.06);border-radius:3px;padding:12px 14px;margin-bottom:8px}
-.quest .qi{width:44px;height:44px;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:22px;background:rgba(255,255,255,.1)}
-.quest .qt{font-weight:900;font-size:15px}
-.quest .qd{font-size:11px;font-weight:700;opacity:.7}
-.quest .qb{height:8px;border-radius:3px;background:rgba(0,0,0,.35);margin-top:6px;overflow:hidden}
-.quest .qb i{display:block;height:100%;background:linear-gradient(90deg,var(--yellow),var(--orange))}
-.quest .qr{margin-left:auto;text-align:right;font-weight:900;font-size:13px;color:var(--green);white-space:nowrap}
 .soon{font-size:11px;font-weight:900;background:var(--blue);padding:3px 8px;border-radius:3px;letter-spacing:.5px}
 /* social + settings */
 .flist{display:flex;flex-direction:column;gap:6px;max-height:220px;overflow:auto}
@@ -373,7 +365,6 @@ body.touch #chat{width:min(290px,50vw)}
         <button data-sec="stats"><span>STATS</span></button>
         <button data-sec="inventory"><span>INVENTORY</span></button>
         <button data-sec="shop"><span>SHOP</span></button>
-        <button data-sec="quests"><span>QUESTS</span></button>
         <button data-sec="social"><span>FRIENDS</span><span id="friendBadge"></span></button>
         <button data-sec="settings"><span>SETTINGS</span></button>
       </nav>
@@ -422,11 +413,6 @@ body.touch #chat{width:min(290px,50vw)}
         <div id="shopNote" style="font-size:12px;font-weight:700;opacity:.75;margin-bottom:10px"></div>
         <div class="grid" id="shopGrid"></div>
         <div id="btOdds" class="hidden"></div>
-      </div>
-
-      <div class="mSec hidden" id="sec-quests">
-        <h2>Quests <span class="soon">COMING SOON</span></h2>
-        <div id="questList"></div>
       </div>
 
       <div class="mSec hidden" id="sec-social">
@@ -682,7 +668,7 @@ applyKeys();
    The main menu is the home screen: PLAY (queue), INVENTORY, SHOP, QUESTS, FRIENDS & PARTY, SETTINGS.
    In a match, M opens it over the court (and closes it again). */
 let menuSec = 'play';
-const SECTIONS = ['play', 'stats', 'inventory', 'shop', 'quests', 'social', 'settings'];
+const SECTIONS = ['play', 'stats', 'inventory', 'shop', 'social', 'settings'];
 function menuOpen() { return !$('#menu').classList.contains('hidden'); }
 const inAMatch = () => S.scene === 'match' && !!S.match;
 function openMenu(sec) {
@@ -1498,6 +1484,38 @@ function landFx(x, y, col) { puff(x, y, 9, 1.8, 0.6, col); }
 function sparkle(x, y, n, col, spread = 1.4, up = 0.6, dur = 0.35, size = 0.035, dx = 0, dy = 0) {
   for (let i = 0; i < n; i++) { const a = Math.random() * TAU, sp = spread * (2 + Math.random() * 4); addPart({ kind: 'spark', x, y, vx: Math.cos(a) * sp + dx * 5, vy: Math.sin(a) * sp + up * 3 + dy * 5, g: 6, drag: 2, life: dur * (0.6 + Math.random() * 0.6), size, col }); }
 }
+/* The block shield over a blocker's head: white (normal), gold (the next block is a sure kill) or cracked in two (broken). */
+function shieldPath(x, y, s) { C.beginPath(); C.moveTo(x - 0.3 * s, y + 0.3 * s); C.quadraticCurveTo(x, y + 0.4 * s, x + 0.3 * s, y + 0.3 * s); C.lineTo(x + 0.28 * s, y - 0.05 * s); C.quadraticCurveTo(x + 0.2 * s, y - 0.3 * s, x, y - 0.4 * s); C.quadraticCurveTo(x - 0.2 * s, y - 0.3 * s, x - 0.28 * s, y - 0.05 * s); C.closePath(); }
+function drawShield(x, y, state, t, s = 1.3) {
+  C.save(); C.lineJoin = 'round';
+  if (state === 'broken') {                          // two halves pushed apart along a jagged crack
+    for (const side of [-1, 1]) {
+      C.save(); C.translate(x + side * 0.06 * s, y - 0.03 * s); C.rotate(-side * 0.14); C.translate(-x, -y);   // each half tips outward about the shield's centre
+      C.beginPath(); C.rect(side < 0 ? x - 0.5 * s : x, y - 0.5 * s, 0.5 * s, 1 * s); C.clip();
+      shieldPath(x, y, s); C.fillStyle = 'rgba(150,158,176,.9)'; C.fill(); C.strokeStyle = 'rgba(40,44,60,.8)'; C.lineWidth = 0.035 * s; C.stroke();
+      C.restore();
+    }
+    C.beginPath(); C.moveTo(x, y + 0.36 * s); C.lineTo(x - 0.05 * s, y + 0.15 * s); C.lineTo(x + 0.05 * s, y); C.lineTo(x - 0.04 * s, y - 0.18 * s); C.lineTo(x, y - 0.38 * s);
+    C.strokeStyle = 'rgba(40,44,60,.85)'; C.lineWidth = 0.03 * s; C.stroke();
+  } else {
+    const gold = state === 'gold';
+    if (gold) { C.shadowColor = 'rgba(255,210,40,.9)'; C.shadowBlur = 18 + Math.sin(t * 6) * 6; }
+    shieldPath(x, y, s);
+    if (gold) { const g = C.createLinearGradient(x, y + 0.4 * s, x, y - 0.4 * s); g.addColorStop(0, '#fff6a8'); g.addColorStop(0.5, '#ffd21f'); g.addColorStop(1, '#d99a00'); C.fillStyle = g; }
+    else C.fillStyle = 'rgba(255,255,255,.92)';
+    C.fill(); C.shadowBlur = 0; C.strokeStyle = gold ? '#8a5c00' : 'rgba(40,44,60,.55)'; C.lineWidth = 0.035 * s; C.stroke();
+    shieldPath(x, y + 0.02 * s, s * 0.72); C.strokeStyle = gold ? 'rgba(255,255,255,.75)' : 'rgba(150,160,180,.55)'; C.lineWidth = 0.025 * s; C.stroke();   // inner rim
+    if (gold) { const k = (t * 0.8) % 1; C.beginPath(); C.moveTo(x - 0.3 * s + k * 0.6 * s, y + 0.35 * s); C.lineTo(x - 0.2 * s + k * 0.6 * s, y + 0.35 * s); C.lineTo(x - 0.35 * s + k * 0.6 * s, y - 0.3 * s); C.lineTo(x - 0.45 * s + k * 0.6 * s, y - 0.3 * s); C.closePath(); C.fillStyle = 'rgba(255,255,255,.45)'; C.save(); shieldPath(x, y, s); C.clip(); C.fill(); C.restore(); }   // a glint sweeping across
+  }
+  C.restore();
+}
+function shieldFx(kind, x, y) {                     // turning gold, breaking, and a spike punching through a broken one
+  if (kind === 'gold') { ringFx(x, y, '#ffd21f', 0.3, 2.6, 0.45, 0.14); ringFx(x, y, '#ffffff', 0.2, 1.5, 0.3, 0.08); sparkle(x, y, 22, '#ffd21f', 1.6, 0.4, 0.5, 0.05); sparkle(x, y, 10, '#ffffff', 1.2, 0.4, 0.4, 0.04); }
+  else if (kind === 'break') {
+    for (let i = 0; i < 14; i++) { const a = Math.random() * TAU, sp = 3 + Math.random() * 5; addPart({ kind: 'conf', x: x + (Math.random() - 0.5) * 0.4, y: y + (Math.random() - 0.5) * 0.5, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + 3, g: 14, drag: 1, life: 0.7 + Math.random() * 0.4, size: 0.06 + Math.random() * 0.07, col: i % 3 ? '#ffffff' : '#c9d0de', rot: Math.random() * 6, vr: (Math.random() - 0.5) * 20, seed: Math.random() * 9 }); }
+    ringFx(x, y, '#ffffff', 0.2, 1.8, 0.3, 0.1);
+  } else if (kind === 'pierce') { sparkle(x, y, 12, '#ffffff', 1.1, 0.1, 0.3, 0.04); ringFx(x, y, 'rgba(255,255,255,.9)', 0.2, 1.1, 0.22, 0.07); }
+}
 function ringFx(x, y, col, r0, r1, dur, w = 0.06) { if (ULTRA) return; FX_LIST.push({ t: 0, dur, draw() { const k = this.t / this.dur; circle(x, y, r0 + (r1 - r0) * k, null, alpha(col, 1 - k), w * (1 - k * 0.5)); } }); }
 function actionFx(kind, x, y, f, purple = false) {   // a quick visual swoosh at the hands for each touch (purple at the stat's milestone)
   if (ULTRA) return; y = y + 0; const S2 = PS;
@@ -1726,7 +1744,7 @@ const staminaSpeed = st => st <= 0.001 ? 0.7 : st < 0.25 ? 0.85 : st < 0.75 ? 1 
 const P = {
   x: -4, y: 0, vx: 0, vy: 0, f: 1, onGround: true,
   airUsed: false, cd: 0, moveDir: 1, moving: false, charging: false, chargeStart: 0, charge: 0,
-  holding: false, serveMode: false, serveAim: null, act: null, dive: null, emote: null, blockUntil: 0, blockHit: false, blockLean: 0, team: 'A', rig: null, jumpF: 1
+  holding: false, serveMode: false, serveAim: null, act: null, dive: null, emote: null, blockUntil: 0, blockHit: false, blockLean: 0, team: 'A', rig: null, jumpF: 1, shield: 'normal'
 };
 let T = 0;
 const faceNet = () => S.match && !S.match.practice;
@@ -1840,7 +1858,7 @@ const ACT_WINDOW = 0.3;
 const BUMP_G = 0.75;                                // bumps float
 /* a pass (bump, dig or first-touch set) costs the team stamina, by how hard the ball was coming; returns the stamina left */
 function payForPass(b, kind, team = P.team, L = stat('set')) {
-  const v = Math.hypot(b.vx, b.vy); const first = b.sideTeam !== team || b.touches === 0 || b.hitType === 'toss';
+  const v = Math.hypot(b.vx, b.vy) * (b.pierceK || 1); const first = b.sideTeam !== team || b.touches === 0 || b.hitType === 'toss';   // through a broken shield: as hard to dig as before
   let cost = 0;
   if (kind === 'bump' || kind === 'dive') cost = passCost(v, L);
   else if (kind === 'set' && first) cost = Math.min(1, passCost(v, L) * 2.2 + 0.08);   // receiving with your hands is much harder on the legs
@@ -1940,10 +1958,27 @@ function blockTouch(b, bx, by, f, nd, lean, L) {
   const r = blockSolve(b, bx, nd, -1, L); r.kind = ''; return r;
 }
 const blockNetDir = () => faceNet() ? (P.team === 'A' ? 1 : -1) : netFrom(P.x);
+/* Every blocker carries a shield. A kill block off a spike turns it gold: the next spike into it is a sure kill, and
+   then it is plain white again. A wipe breaks it for the rest of the play: half the spikes into a broken shield go
+   straight through at half speed (still as hard to dig as the full-speed spike). A new play mends a broken shield;
+   a gold one stays gold. Each player keeps their own, for the whole match. */
+const SH_CODE = { normal: 0, gold: 1, broken: 2 }, SH_NAME = ['normal', 'gold', 'broken'];
+const shieldAt = rig => ({ x: rig.x, y: rig.headTop() + 1.15 });   // above the name tag
+function shieldBlock(h, rig, b, compute, bx, nd, L) {
+  if (b.hitType !== 'spike') return compute();
+  const at = shieldAt(rig);
+  if (h.shield === 'broken' && Math.random() < 0.5) { b.vx *= 0.5; b.vy *= 0.5; b.pierceK = (b.pierceK || 1) * 2; shieldFx('pierce', at.x, at.y); return null; }
+  if (h.shield === 'gold') { h.shield = 'normal'; const r = blockSolve(b, bx, nd, 1, L); shieldFx('gold', at.x, at.y); return r; }
+  const r = compute();
+  if (r.kind === 'KILL BLOCK' && h.shield === 'normal') { h.shield = 'gold'; shieldFx('gold', at.x, at.y); }
+  else if (r.kind === 'WIPE' && h.shield === 'normal') { h.shield = 'broken'; shieldFx('break', at.x, at.y); }
+  return r;
+}
 function blockContact() {
   P.blockHit = true; camKick(-0.03, 2.6);
-  const r = blockTouch(B, P.x, P.y, P.f, blockNetDir(), P.blockLean, stat('block'));
-  hitBall('block', r.vx, r.vy, r.g); if (r.kind) showBallMsg(r.kind, B);
+  const r = shieldBlock(P, P.rig, B, () => blockTouch(B, P.x, P.y, P.f, blockNetDir(), P.blockLean, stat('block')), P.x, blockNetDir(), stat('block'));
+  if (!r) { writeBall(B); return; }                                         // straight through the broken shield
+  hitBall('block', r.vx, r.vy, r.g);
   if (myPurple('block')) ringFx(B.x, B.y, '#b25cff', 0.3, 2.4, 0.35, 0.12); else ringFx(B.x, B.y, '#ffffff', 0.3, 1.8, 0.3, 0.08);
 }
 const FULL_T = 0.5625;
@@ -2077,7 +2112,7 @@ function computePath(b) {                          // replay the ball's own phys
 function hitBall(type, vx, vy, g, charge = 0) {
   const b = B; if (!b) return;
   b.vx = vx; b.vy = vy; b.g = g; b.seq++; b.t = snow(); b.held = null; b.active = true; b.frozen = false; b.pf = null; b.acc = 0; b.netSide = 0;
-  b.nt = null; b.brk = false; b.quickFor = null; b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = SID; b.hitType = type; b.fx = me.fx || 'none'; b.hm = me.model || 'boy'; b.hitterX = P.x; b.hitAtT = T; b.pu = purpleMask();
+  b.nt = null; b.brk = false; b.quickFor = null; b.pierceK = 0; b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = SID; b.hitType = type; b.fx = me.fx || 'none'; b.hm = me.model || 'boy'; b.hitterX = P.x; b.hitAtT = T; b.pu = purpleMask();
   if (type === 'toss' || type === 'block') { b.touches = 0; b.sideTeam = P.team; }
   else { if (b.sideTeam !== P.team) { b.sideTeam = P.team; b.touches = 1; } else b.touches++; }
   if (type !== 'toss') { b.serve = false; P.serving = false; }
@@ -2219,12 +2254,12 @@ function updateBalls(dt) {
   if (T < P.blockUntil && !P.onGround && blockReach() && B.hitter !== SID && B.vx * blockNetDir() < 0 && Math.abs(B.x) < NET_GAP + 3.2) blockContact();   // blocks reach over the net and lean with you
   if (P.dive && !P.dive.hit && ballReach(P.x + P.dive.dir * 1.0 * PS, P.y + 0.6 * PS, 1.8 * HB)) diveContact();
 }
-/* ---- a word popped up at the ball (WIPE, KILL BLOCK, RECEIVE BREAK) ---- */
+/* ---- a word popped up at the ball (RECEIVE BREAK) ---- */
 let ballMsg = null;
 function showBallMsg(text, b) { ballMsg = { text, b, x: b.x, y: b.y, until: performance.now() + 1500 }; }
 
 /* ---------------- Ball sync ---------------- */
-function ballRecord(b) { return { active: b.active, held: b.held || null, frozen: b.frozen, x: b.x, y: b.y, vx: b.vx, vy: b.vy, g: b.g, seq: b.seq, t: b.t, hitter: b.hitter || null, hitType: b.hitType || null, prevHitter: b.prevHitter || null, prevType: b.prevType || null, touches: b.touches, sideTeam: b.sideTeam, serve: !!b.serve, tossedBy: b.tossedBy || null, skin: b.skin || 'default', fx: b.fx || 'none', hm: b.hm || 'boy', hitterX: b.hitterX === null ? null : b.hitterX, ds: !!b.ds, pf: b.pf || null, pu: b.pu || 0, nt: b.nt || null, d2: 1, by: SID }; }
+function ballRecord(b) { return { active: b.active, held: b.held || null, frozen: b.frozen, x: b.x, y: b.y, vx: b.vx, vy: b.vy, g: b.g, seq: b.seq, t: b.t, hitter: b.hitter || null, hitType: b.hitType || null, prevHitter: b.prevHitter || null, prevType: b.prevType || null, touches: b.touches, sideTeam: b.sideTeam, serve: !!b.serve, tossedBy: b.tossedBy || null, skin: b.skin || 'default', fx: b.fx || 'none', hm: b.hm || 'boy', hitterX: b.hitterX === null ? null : b.hitterX, ds: !!b.ds, pf: b.pf || null, pu: b.pu || 0, nt: b.nt || null, pk: b.pierceK || 0, d2: 1, by: SID }; }
 function writeBall(b) {
   if (!b || !S.online) return;
   if (b.id === 'match') { const r = mref('ball'); if (r) r.set(ballRecord(b)); }
@@ -2235,7 +2270,7 @@ function receiveBall(b, v) {
   b.seq = v.seq; b.active = !!v.active; b.held = v.held || null; b.frozen = !!v.frozen; b.g = v.g || 1; b.t = v.t || snow();
   b.hitter = v.hitter || null; b.hitType = v.hitType || null; b.prevHitter = v.prevHitter || null; b.prevType = v.prevType || null; b.touches = v.touches || 0; b.sideTeam = v.sideTeam || 'A';
   b.serve = !!v.serve; b.tossedBy = v.tossedBy || null; b.landed = false; b.netSide = 0;
-  b.skin = v.skin || 'default'; b.fx = v.fx || 'none'; b.hm = v.hm || 'boy'; b.hitterX = v.hitterX === undefined ? null : v.hitterX; b.pf = v.pf || null; b.pu = v.pu || 0; b.nt = v.nt || null; b.hitAtT = T;
+  b.skin = v.skin || 'default'; b.fx = v.fx || 'none'; b.hm = v.hm || 'boy'; b.hitterX = v.hitterX === undefined ? null : v.hitterX; b.pf = v.pf || null; b.pu = v.pu || 0; b.nt = v.nt || null; b.pierceK = v.pk || 0; b.hitAtT = T;
   if (P.holding && B === b && b.held !== SID) { P.holding = false; P.serveMode = false; P.serveAim = null; P.rig.base = P.onGround ? 'idle' : 'air'; P.rig.setPose(P.rig.base); }
   const newHit = v.hitType === 'spike' && v.seq !== b.lastSparkSeq; b.lastSparkSeq = v.seq;
   if (b.active && !b.held) {
@@ -2318,7 +2353,7 @@ function updateRemotes(dt) {
   }
 }
 function myState() {
-  return { d2: 1, name: me.name, id: me.id, team: S.scene === 'match' ? P.team : 'L', x: +P.x.toFixed(2), y: +P.y.toFixed(2), f: P.f, g: P.onGround && !P.dive ? 1 : 0, anim: P.rig.anim, em: P.emote ? P.emote.id : '', pt: P.diveAnim || 0, md: me.model || 'boy', pu: purpleMask() };
+  return { d2: 1, name: me.name, id: me.id, team: S.scene === 'match' ? P.team : 'L', x: +P.x.toFixed(2), y: +P.y.toFixed(2), f: P.f, g: P.onGround && !P.dive ? 1 : 0, anim: P.rig.anim, em: P.emote ? P.emote.id : '', pt: P.diveAnim || 0, md: me.model || 'boy', pu: purpleMask(), sh: SH_CODE[P.shield] || 0 };
 }
 
 /* ---------------- Touch controls ----------------
@@ -2641,19 +2676,6 @@ async function sellStat(k, n) {                    // take points back out: ever
   if (res.committed) toast(`${STAT_INFO[k][0]} -${n} (+$${(n * STAT_COST).toLocaleString()})`, 'ok');
 }
 
-/* ---------------- Quests (placeholder until they are real) ---------------- */
-const QUESTS = [
-  ['🏐', 'Warm Up', 'Play 3 matches of any mode', 0, 3, '$150'],
-  ['🔥', 'Spike Machine', 'Land 20 spikes in', 0, 20, '$250'],
-  ['🧱', 'Wall', 'Get 5 blocks in online matches', 0, 5, '$300'],
-  ['🤝', 'Better Together', 'Win a match with a friend in your party', 0, 1, '$400'],
-  ['🎯', 'Ace', 'Serve an ace', 0, 1, '$200'],
-];
-function renderQuests() {
-  $('#questList').innerHTML = '<div class="pane" style="font-weight:800;font-size:13px">Daily quests will reset every day at midnight EST. They are not live yet - here is what is coming.</div>' +
-    QUESTS.map(([ic, t, d, p, n, r]) => `<div class="quest"><div class="qi">${ic}</div><div style="flex:1"><div class="qt">${t}</div><div class="qd">${d}</div><div class="qb"><i style="width:${(p / n * 100).toFixed(0)}%"></i></div></div><div class="qr">${r}<br><small style="opacity:.6">${p}/${n}</small></div></div>`).join('');
-}
-
 /* ---------------- Chat (global + party) ---------------- */
 let chatTab = 'global', lastChatSend = 0;
 const chatLog = $('#chatLog'), chatInput = $('#chatInput');
@@ -2880,7 +2902,7 @@ async function matchmake(mode, qid) {           // every queue leader tries: fil
 setInterval(() => { if (S.queue) { $('#queueStatusText').textContent = queueLabel(); if (menuOpen() && menuSec === 'play') $('#queueInfo').textContent = queueLabel(); } }, 500);
 function renderSection(sec) {
   if (sec === 'play') renderPlay(); else if (sec === 'inventory') renderInventory(); else if (sec === 'shop') renderShop();
-  else if (sec === 'quests') renderQuests(); else if (sec === 'stats') renderStats(); else if (sec === 'social') { renderFriends(); renderParty(); } else if (sec === 'settings') renderSettings();
+  else if (sec === 'stats') renderStats(); else if (sec === 'social') { renderFriends(); renderParty(); } else if (sec === 'settings') renderSettings();
   $('#mMoney').textContent = me.guest ? '0' : (me.dollars || 0).toLocaleString();
 }
 function onMenuClosed() { canvas.focus(); }
@@ -2933,7 +2955,7 @@ function endPoint(winner, msg) {
 function onStateChange(st) {
   const M = S.match, b = matchBall(); if (!M) return; const prev = M.state; M.state = st;
   if (st === 'point') { P.serving = false; if (P.holding) { P.holding = false; P.serveMode = false; P.serveAim = null; if (b) b.held = null; P.rig.base = 'idle'; P.rig.setPose('idle'); } }
-  if (st === 'serve') { if (M.bots) botsOnServe(); P.serving = false; if (b) { b.active = false; b.held = null; b.frozen = false; } if (!M.practice && prev !== st) resetToSpawn(); P.holding = false; P.serveMode = false; P.serveAim = null; if (P.rig.base === 'hold') { P.rig.base = 'idle'; P.rig.setPose('idle'); } }
+  if (st === 'serve') { if (P.shield === 'broken') P.shield = 'normal'; if (M.bots) botsOnServe(); P.serving = false; if (b) { b.active = false; b.held = null; b.frozen = false; } if (!M.practice && prev !== st) resetToSpawn(); P.holding = false; P.serveMode = false; P.serveAim = null; if (P.rig.base === 'hold') { P.rig.base = 'idle'; P.rig.setPose('idle'); } }
   if (st === 'over' && prev !== 'over') {
     const winner = (M.score.A > M.score.B) ? 'A' : 'B'; const won = teamOf(SID) === winner;
     if (!M.practice) { const w = M.bots ? 50 : 150, l = M.bots ? 20 : 50; addDollars(won ? w : l); toast(won ? 'Victory! +$' + w : 'Defeat. +$' + l, won ? 'ok' : 'err', 5000); }
@@ -2963,7 +2985,7 @@ function setMyRig(variant) {
 }
 function onCosmeticsChanged() { if (P.rig) setMyRig(P.rig.variant); drawAvatar(); if (menuOpen()) showSection(menuSec); }
 function beginMatch(M) {
-  M.enteredAt = T; M.absentSince = 0;
+  M.enteredAt = T; M.absentSince = 0; P.shield = 'normal';
   cancelQueue(false);
   S.match = M; S.scene = 'match'; closePanels(); remotesClear(); BOTS.length = 0; document.body.classList.add('inMatch'); document.body.classList.remove('inMenu');
   MATCH_NET = new Net2D(0, M.map === 'beach' ? 'beach' : 'indoor');
@@ -3092,7 +3114,7 @@ const myHitH = () => jumpV(stat('jump')) ** 2 / (2 * G) * 0.92 + 1.92 * PS + spi
 const BOT_HIGH = 2.0 * PS, BOT_LOW = 1.05 * PS;
 function makeBot(id, name, model, team, idx, n) {
   const rig = new Rig2D(TEAM_VARIANT[team], 'boy', 1 + (idx + (team === 'B' ? 3 : 0)) % (HAIRS.length - 1)); rig.ready = true;   // same athlete, different hair so you can tell them apart
-  const bot = { id, name, model, team, idx, n, rig, x: spawnX(team, idx, n), y: 0, vx: 0, vy: 0, onGround: true, f: -teamSide(team), target: null, role: 'player', plan: null, blockUntil: 0, blockTilt: -1, spike: null, lastHitT: -9, serveAt: 0, coin: 0, base: 0 };
+  const bot = { id, name, model, team, idx, n, rig, x: spawnX(team, idx, n), y: 0, vx: 0, vy: 0, onGround: true, f: -teamSide(team), target: null, role: 'player', plan: null, blockUntil: 0, blockTilt: -1, spike: null, lastHitT: -9, serveAt: 0, coin: 0, base: 0, shield: 'normal' };
   bot.st = botStats(); bot.jv = jumpV(bot.st.jump); bot.jh = bot.jv * bot.jv / (2 * G);
   bot.base = bot.x; rig.place(bot.x, 0, bot.f, true); rig.snap();
   remotes.set(id, { bot: true, rig, name, data: { team, name, f: bot.f, g: 1 }, x: bot.x, y: 0 });
@@ -3154,7 +3176,7 @@ function botJump(bot, straight = false) { if (!bot.onGround) return; if (straigh
 function botHit(bot, type, vx, vy, g = 1) {
   const b = matchBall(); if (!b) return;
   b.vx = vx; b.vy = vy; b.g = g; b.seq++; b.t = snow(); b.held = null; b.active = true; b.frozen = false; b.pf = null; b.acc = 0; b.netSide = 0; b.pu = 0;
-  b.nt = null; b.brk = false; b.quickFor = null; b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = bot.id; b.hitType = type; b.fx = 'none'; b.hm = bot.model; b.hitterX = bot.x; b.hitAtT = T;
+  b.nt = null; b.brk = false; b.quickFor = null; b.pierceK = 0; b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = bot.id; b.hitType = type; b.fx = 'none'; b.hm = bot.model; b.hitterX = bot.x; b.hitAtT = T;
   if (type === 'block') { b.touches = 0; b.sideTeam = bot.team; } else { if (b.sideTeam !== bot.team) { b.sideTeam = bot.team; b.touches = 1; } else b.touches++; }
   b.serve = false; b.spin = (Math.random() - 0.5) * 8 - vx * 1.5; b.landed = false; b.ds = false;
   if (type === 'spike') { showSpikeInfo(vx, vy, b.y); spikeRing(b.x, b.y, vx, vy); sparkle(b.x, b.y, 14, '#ffffff', 1.3, 0.2, 0.3, 0.035, vx / 30, vy / 30); }
@@ -3191,7 +3213,7 @@ function botSpike(bot) {
 }
 function botsOnServe() {
   const M = S.match; if (!M || !M.bots) return;
-  for (const bot of BOTS) { bot.plan = null; bot.target = bot.base; bot.x = bot.base; bot.vx = bot.vy = 0; bot.onGround = true; bot.y = 0; bot.rig.base = 'idle'; bot.rig.setPose('idle'); bot.coin = Math.random(); bot.blockUntil = 0; bot.spike = null; bot.dive = null; bot.jserve = null; bot.rig.pitchTarget = 0; }
+  for (const bot of BOTS) { if (bot.shield === 'broken') bot.shield = 'normal'; bot.plan = null; bot.target = bot.base; bot.x = bot.base; bot.vx = bot.vy = 0; bot.onGround = true; bot.y = 0; bot.rig.base = 'idle'; bot.rig.setPose('idle'); bot.coin = Math.random(); bot.blockUntil = 0; bot.spike = null; bot.dive = null; bot.jserve = null; bot.rig.pitchTarget = 0; }
   const s = M.serve && BOTS.find(x => x.id === M.serve.sid);
   if (s) { const cd = courtDims(); s.x = teamSide(s.team) * (cd.half + 1.6); s.target = null; s.serveAt = T + 1.6 + Math.random() * 0.8; }
 }
@@ -3373,8 +3395,9 @@ function botBlockContacts() {
     const s = teamSide(bot.team);
     if (bot.onGround || T >= bot.blockUntil || bot.blockMiss || b.hitter === bot.id || b.vx * s <= 0 || b.x * s > 0.9 || b.x * s < -1.3) continue;
     const top = bot.y + 2.25 * PS + 0.85 * HB; if (b.y < bot.y - BALL_R || b.y > top + BALL_R) continue; const t = clamp((b.y - bot.y) / (top - bot.y), 0, 1); if (Math.abs(b.x - (bot.x + bot.f * 0.3 * PS * t)) > 0.7 * HB + BALL_R) continue;   // feet to hands, like a player's block
-    const r = blockTouch(b, bot.x, bot.y, bot.f, -s, (bot.blockTilt || -1) * 0.3, bot.st.block);   // the same block a player makes
-    botHit(bot, 'block', r.vx, r.vy, r.g); if (r.kind) showBallMsg(r.kind, b);
+    const r = shieldBlock(bot, bot.rig, b, () => blockTouch(b, bot.x, bot.y, bot.f, -s, (bot.blockTilt || -1) * 0.3, bot.st.block), bot.x, -s, bot.st.block);   // the same block (and shield) a player has
+    if (!r) { bot.blockMiss = true; continue; }
+    botHit(bot, 'block', r.vx, r.vy, r.g);
   }
 }
 function updateBots(dt) {
@@ -3447,6 +3470,12 @@ function render(dt) {
   shadow(P.x, P.y);
   for (const r of remotes.values()) if (onScreen(r.x - 2, r.x + 2)) r.rig.draw();
   P.rig.draw();
+  for (const [sid, r] of remotes) {                // shields over everyone who is up blocking
+    if (!onScreen(r.x - 2, r.x + 2)) continue; const bot = r.bot ? BOTS.find(x => x.id === sid) : null;
+    const up = bot ? !bot.onGround && T < bot.blockUntil : r.rig.anim === 'block' && r.y > 0.3;
+    if (up) { const a = shieldAt(r.rig); drawShield(a.x, a.y, bot ? bot.shield : SH_NAME[(r.data && r.data.sh) || 0], T); }
+  }
+  if (T < P.blockUntil && !P.onGround) { const a = shieldAt(P.rig); drawShield(a.x, a.y, P.shield, T); }
   for (const b of balls.values()) {                // the dotted path of the last set, from where the ball is now
     if (!b.active || !b.path || b.held) continue; const p = b.path; if (b.landed) { b.path = null; continue; }
     while (b.pathI < p.length - 1 && Math.hypot(p[b.pathI + 1][0] - b.x, p[b.pathI + 1][1] - b.y) < Math.hypot(p[b.pathI][0] - b.x, p[b.pathI][1] - b.y)) b.pathI++;

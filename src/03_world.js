@@ -594,6 +594,38 @@ function landFx(x, y, col) { puff(x, y, 9, 1.8, 0.6, col); }
 function sparkle(x, y, n, col, spread = 1.4, up = 0.6, dur = 0.35, size = 0.035, dx = 0, dy = 0) {
   for (let i = 0; i < n; i++) { const a = Math.random() * TAU, sp = spread * (2 + Math.random() * 4); addPart({ kind: 'spark', x, y, vx: Math.cos(a) * sp + dx * 5, vy: Math.sin(a) * sp + up * 3 + dy * 5, g: 6, drag: 2, life: dur * (0.6 + Math.random() * 0.6), size, col }); }
 }
+/* The block shield over a blocker's head: white (normal), gold (the next block is a sure kill) or cracked in two (broken). */
+function shieldPath(x, y, s) { C.beginPath(); C.moveTo(x - 0.3 * s, y + 0.3 * s); C.quadraticCurveTo(x, y + 0.4 * s, x + 0.3 * s, y + 0.3 * s); C.lineTo(x + 0.28 * s, y - 0.05 * s); C.quadraticCurveTo(x + 0.2 * s, y - 0.3 * s, x, y - 0.4 * s); C.quadraticCurveTo(x - 0.2 * s, y - 0.3 * s, x - 0.28 * s, y - 0.05 * s); C.closePath(); }
+function drawShield(x, y, state, t, s = 1.3) {
+  C.save(); C.lineJoin = 'round';
+  if (state === 'broken') {                          // two halves pushed apart along a jagged crack
+    for (const side of [-1, 1]) {
+      C.save(); C.translate(x + side * 0.06 * s, y - 0.03 * s); C.rotate(-side * 0.14); C.translate(-x, -y);   // each half tips outward about the shield's centre
+      C.beginPath(); C.rect(side < 0 ? x - 0.5 * s : x, y - 0.5 * s, 0.5 * s, 1 * s); C.clip();
+      shieldPath(x, y, s); C.fillStyle = 'rgba(150,158,176,.9)'; C.fill(); C.strokeStyle = 'rgba(40,44,60,.8)'; C.lineWidth = 0.035 * s; C.stroke();
+      C.restore();
+    }
+    C.beginPath(); C.moveTo(x, y + 0.36 * s); C.lineTo(x - 0.05 * s, y + 0.15 * s); C.lineTo(x + 0.05 * s, y); C.lineTo(x - 0.04 * s, y - 0.18 * s); C.lineTo(x, y - 0.38 * s);
+    C.strokeStyle = 'rgba(40,44,60,.85)'; C.lineWidth = 0.03 * s; C.stroke();
+  } else {
+    const gold = state === 'gold';
+    if (gold) { C.shadowColor = 'rgba(255,210,40,.9)'; C.shadowBlur = 18 + Math.sin(t * 6) * 6; }
+    shieldPath(x, y, s);
+    if (gold) { const g = C.createLinearGradient(x, y + 0.4 * s, x, y - 0.4 * s); g.addColorStop(0, '#fff6a8'); g.addColorStop(0.5, '#ffd21f'); g.addColorStop(1, '#d99a00'); C.fillStyle = g; }
+    else C.fillStyle = 'rgba(255,255,255,.92)';
+    C.fill(); C.shadowBlur = 0; C.strokeStyle = gold ? '#8a5c00' : 'rgba(40,44,60,.55)'; C.lineWidth = 0.035 * s; C.stroke();
+    shieldPath(x, y + 0.02 * s, s * 0.72); C.strokeStyle = gold ? 'rgba(255,255,255,.75)' : 'rgba(150,160,180,.55)'; C.lineWidth = 0.025 * s; C.stroke();   // inner rim
+    if (gold) { const k = (t * 0.8) % 1; C.beginPath(); C.moveTo(x - 0.3 * s + k * 0.6 * s, y + 0.35 * s); C.lineTo(x - 0.2 * s + k * 0.6 * s, y + 0.35 * s); C.lineTo(x - 0.35 * s + k * 0.6 * s, y - 0.3 * s); C.lineTo(x - 0.45 * s + k * 0.6 * s, y - 0.3 * s); C.closePath(); C.fillStyle = 'rgba(255,255,255,.45)'; C.save(); shieldPath(x, y, s); C.clip(); C.fill(); C.restore(); }   // a glint sweeping across
+  }
+  C.restore();
+}
+function shieldFx(kind, x, y) {                     // turning gold, breaking, and a spike punching through a broken one
+  if (kind === 'gold') { ringFx(x, y, '#ffd21f', 0.3, 2.6, 0.45, 0.14); ringFx(x, y, '#ffffff', 0.2, 1.5, 0.3, 0.08); sparkle(x, y, 22, '#ffd21f', 1.6, 0.4, 0.5, 0.05); sparkle(x, y, 10, '#ffffff', 1.2, 0.4, 0.4, 0.04); }
+  else if (kind === 'break') {
+    for (let i = 0; i < 14; i++) { const a = Math.random() * TAU, sp = 3 + Math.random() * 5; addPart({ kind: 'conf', x: x + (Math.random() - 0.5) * 0.4, y: y + (Math.random() - 0.5) * 0.5, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp + 3, g: 14, drag: 1, life: 0.7 + Math.random() * 0.4, size: 0.06 + Math.random() * 0.07, col: i % 3 ? '#ffffff' : '#c9d0de', rot: Math.random() * 6, vr: (Math.random() - 0.5) * 20, seed: Math.random() * 9 }); }
+    ringFx(x, y, '#ffffff', 0.2, 1.8, 0.3, 0.1);
+  } else if (kind === 'pierce') { sparkle(x, y, 12, '#ffffff', 1.1, 0.1, 0.3, 0.04); ringFx(x, y, 'rgba(255,255,255,.9)', 0.2, 1.1, 0.22, 0.07); }
+}
 function ringFx(x, y, col, r0, r1, dur, w = 0.06) { if (ULTRA) return; FX_LIST.push({ t: 0, dur, draw() { const k = this.t / this.dur; circle(x, y, r0 + (r1 - r0) * k, null, alpha(col, 1 - k), w * (1 - k * 0.5)); } }); }
 function actionFx(kind, x, y, f, purple = false) {   // a quick visual swoosh at the hands for each touch (purple at the stat's milestone)
   if (ULTRA) return; y = y + 0; const S2 = PS;
