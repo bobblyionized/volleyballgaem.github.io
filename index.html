@@ -85,8 +85,8 @@ input:focus,select:focus{border-color:var(--yellow)}
 #modeTxt{position:absolute;top:80px;left:50%;transform:translateX(-50%);font-size:11px;opacity:.75;font-style:italic;font-weight:800;white-space:nowrap}
 #spikeInfo{position:absolute;top:100px;left:50%;transform:translateX(-50%);display:flex;gap:46px;pointer-events:none;opacity:0;transition:opacity .35s;white-space:nowrap}
 #spikeInfo.on{opacity:1;transition:opacity .08s}
-#spikeInfo div{font-size:44px;font-weight:900;color:#fff;letter-spacing:-1px;text-shadow:0 3px 0 rgba(0,0,0,.35),0 0 14px rgba(0,0,0,.25)}
-#spikeInfo small{font-size:24px;font-weight:800;margin-left:3px;opacity:.95}
+#spikeInfo div{font-size:33px;font-weight:900;color:#fff;letter-spacing:-1px;text-shadow:0 3px 0 rgba(0,0,0,.35),0 0 14px rgba(0,0,0,.25)}
+#spikeInfo small{font-size:18px;font-weight:800;margin-left:3px;opacity:.95}
 #touches{position:absolute;top:158px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
 #touches i{width:12px;height:12px;border-radius:3px;background:rgba(0,0,0,.35);border:2px solid #fff}
 #touches i.on{background:var(--yellow)}
@@ -100,12 +100,6 @@ input:focus,select:focus{border-color:var(--yellow)}
 #loadBar{width:320px;max-width:80vw;height:14px;border:3px solid #fff;border-radius:3px;background:rgba(20,40,90,.25);margin-top:14px;overflow:hidden}
 #loadBar i{display:block;height:100%;width:0;background:var(--orange);transition:width .25s}
 #loadPct{font-size:12px;font-weight:900;font-style:normal;margin-top:6px;color:#1b2b55;text-shadow:none}
-/* emote wheel */
-#emoteWheel{position:absolute;left:50%;top:50%;width:360px;height:360px;transform:translate(-50%,-50%);pointer-events:none;z-index:20}
-#emoteWheel .slot{position:absolute;width:92px;height:92px;margin:-46px 0 0 -46px;background:rgba(14,21,48,.9);border:2px solid var(--line);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;font-weight:900;text-transform:uppercase;text-align:center;color:#cfd6ee}
-#emoteWheel .slot.sel{background:var(--yellow);color:#111;border-color:#fff}
-#emoteWheel .slot small{font-size:9px;opacity:.6;font-weight:700}
-#emoteWheel .center{position:absolute;left:50%;top:50%;width:70px;height:70px;margin:-35px 0 0 -35px;background:rgba(14,21,48,.9);border:2px solid var(--line);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900}
 
 /* ---------- touch controls ---------- */
 #touchUi{position:absolute;inset:0;pointer-events:none}
@@ -301,7 +295,7 @@ body.touch #chat{width:min(290px,50vw)}
 #btOdds .odd{--rc:#999;border:2px solid var(--rc);padding:6px 12px;display:flex;flex-direction:column;align-items:center;min-width:74px}
 #btOdds .odd b{font-size:22px;font-style:italic;color:var(--rc)}#btOdds .odd span{font-weight:900}#btOdds .odd small{font-size:10px;opacity:.7;font-weight:700}
 /* stats */
-.stat{display:grid;grid-template-columns:90px 1fr 120px 116px;gap:4px 12px;align-items:center;background:rgba(255,255,255,.06);padding:10px 12px;margin-bottom:8px;border-left:4px solid var(--yellow)}
+.stat{display:grid;grid-template-columns:90px 1fr 110px auto;gap:4px 12px;align-items:center;background:rgba(255,255,255,.06);padding:10px 12px;margin-bottom:8px;border-left:4px solid var(--yellow)}
 .stat.maxed{border-left-color:#b25cff;background:rgba(178,92,255,.12)}
 .stat .sn{font-size:17px;font-weight:900;font-style:italic;text-transform:uppercase}
 .stat .sbar{position:relative;height:14px;background:rgba(0,0,0,.4)}
@@ -309,7 +303,7 @@ body.touch #chat{width:min(290px,50vw)}
 .stat .sbar em{position:absolute;top:0;bottom:0;background:#b25cff}
 .stat .sbar s{position:absolute;top:-3px;bottom:-3px;width:2px;background:rgba(255,255,255,.7)}
 .stat .sv{font-size:14px;font-weight:900}.stat .sv .bonus{color:#d9a8ff}.stat .sv small{display:block;font-size:10px;opacity:.65}
-.stat .sb{display:flex;gap:6px}.stat .sb button{padding:6px 8px;font-size:11px;background:var(--green);color:#06301a}
+.stat .sb{display:flex;gap:6px}.stat .sb button{padding:6px 8px;font-size:11px;background:var(--green);color:#06301a}.stat .sb button.minus{background:var(--red,#e5484d);color:#fff}
 .stat .sd{grid-column:1/-1;font-size:11px;font-weight:700;opacity:.8}
 .stat .pu{color:#d9a8ff;font-weight:900}.dim{opacity:.55}
 .chip{--rc:#999;display:inline-block;border:2px solid var(--rc);padding:3px 8px;margin:0 6px 6px 0;font-size:12px;font-weight:800}.chip b{color:var(--rc);font-style:italic}
@@ -329,7 +323,6 @@ body.touch #chat{width:min(290px,50vw)}
     <div class="tbtn" data-act="q">BUMP</div>
     <div class="tbtn" data-act="e">JUMP SET</div>
     <div class="tbtn" data-act="dive">DIVE</div>
-    <div class="tbtn" data-act="emote">EMOTE</div>
     <div class="tbtn" data-act="menu">MENU</div>
     <div class="tbtn" data-act="ball">BALL</div>
     <div class="tbtn" data-act="serve">SERVE</div>
@@ -346,7 +339,6 @@ body.touch #chat{width:min(290px,50vw)}
     <div id="chatLog"></div>
     <input id="chatInput" maxlength="120" placeholder="Press / to chat..." autocomplete="off">
   </div>
-  <div id="emoteWheel" class="hidden"><div class="center">EMOTES</div></div>
   <div id="inviteBox" class="hidden"><span id="inviteText"></span><button class="btn green small" id="inviteAccept">ACCEPT</button><button class="btn red small" id="inviteDecline">DECLINE</button></div>
   <div id="actions"></div>
 
@@ -414,7 +406,7 @@ body.touch #chat{width:min(290px,50vw)}
 
       <div class="mSec hidden" id="sec-inventory">
         <h2>Inventory</h2>
-        <div class="subtabs" id="invNav"><button class="on" data-inv="skins">Balls</button><button data-inv="fx">Score FX</button><button data-inv="emotes">Emotes</button><button data-inv="bt">Breakthroughs</button></div>
+        <div class="subtabs" id="invNav"><button class="on" data-inv="skins">Balls</button><button data-inv="fx">Score FX</button><button data-inv="bt">Breakthroughs</button></div>
         <div id="invBody">
           <div id="invMain"><div id="invGrid"></div><div id="invDetail"></div></div>
           <div id="invTraits" class="hidden">
@@ -427,7 +419,7 @@ body.touch #chat{width:min(290px,50vw)}
 
       <div class="mSec hidden" id="sec-shop">
         <h2>Shop</h2>
-        <div class="subtabs" id="shopTabs"><button class="on" data-tab="skins">Balls</button><button data-tab="fx">Score FX</button><button data-tab="emotes">Emotes</button><button data-tab="bt">Breakthroughs</button></div>
+        <div class="subtabs" id="shopTabs"><button class="on" data-tab="skins">Balls</button><button data-tab="fx">Score FX</button><button data-tab="bt">Breakthroughs</button></div>
         <div id="shopNote" style="font-size:12px;font-weight:700;opacity:.75;margin-bottom:10px"></div>
         <div class="grid" id="shopGrid"></div>
         <div id="btOdds" class="hidden"></div>
@@ -604,32 +596,33 @@ const S = { online: false, scene: 'menu', padId: null, queue: null, match: null,
 const SID = 's' + rnd() + Date.now().toString(36);   // unique per tab
 const me = { sid: SID, id: SID, name: 'Guest', guest: true, dollars: 0, friends: {}, requests: {}, lower: null, skins: {}, skin: 'default', fxs: {}, fx: 'none', model: 'boy', models: {}, emotes: {}, wheel: {}, boxes: {}, traits: {}, loadout: {}, stats: {}, bts: {}, btLoad: {} };
 
+let btSwept = false;                         // duplicate breakthroughs are cleared once per session, when the profile first loads
 /* ---------------- Keybinds ---------------- */
 /* Every control the game reads goes through KEYS. In 2D: A / D run, W / S aim (spike, block, bump strength,
    jump set) and climb onto / drop off the stairs. Escape always closes the menu on top of whatever it is bound to. */
 const KEY_DEFAULTS = {
   moveL: 'KeyA', moveR: 'KeyD',
   block: 'KeyQ', bump: 'Space', dive: 'ControlLeft', jumpSet: 'KeyE',
-  groundSet: 'Mouse0', spike: 'Space', toss: 'Mouse0', spawnBall: 'KeyG', serve: 'Digit1', jump: 'KeyW', emote: 'KeyB',
+  groundSet: 'Mouse0', spike: 'Space', toss: 'Mouse0', spawnBall: 'KeyG', serve: 'Digit1', jump: 'KeyW',
   chat: 'Slash', menu: 'KeyM'
 };
 // mirrored to the right of the keyboard, for players who hold the mouse in their left hand
 const KEY_LEFTY = {
   moveL: 'ArrowLeft', moveR: 'ArrowRight',
   block: 'KeyP', bump: 'ShiftRight', dive: 'ControlRight', jumpSet: 'KeyO',
-  groundSet: 'Mouse0', spike: 'ShiftRight', toss: 'Mouse0', spawnBall: 'KeyL', serve: 'Digit0', jump: 'ArrowUp', emote: 'Semicolon',
+  groundSet: 'Mouse0', spike: 'ShiftRight', toss: 'Mouse0', spawnBall: 'KeyL', serve: 'Digit0', jump: 'ArrowUp',
   chat: 'Slash', menu: 'KeyM'
 };
 const KEY_LABELS = {
   moveL: 'Run Left', moveR: 'Run Right',
   block: 'Block', bump: 'Bump (hold)', dive: 'Dive', jumpSet: 'Jump Set', groundSet: 'Ground Set',
-  spike: 'Spike', toss: 'Toss / Serve toss', spawnBall: 'Spawn Ball (practice)', serve: 'Serve (practice)', jump: 'Jump', emote: 'Emote Wheel',
+  spike: 'Spike', toss: 'Toss / Serve toss', spawnBall: 'Spawn Ball (practice)', serve: 'Serve (practice)', jump: 'Jump',
   chat: 'Chat', menu: 'Menu'
 };
 const KEY_GROUPS = [
   ['Movement', ['moveL', 'moveR', 'jump', 'dive']],
   ['Ball', ['bump', 'groundSet', 'jumpSet', 'block', 'spike', 'toss', 'serve', 'spawnBall']],
-  ['Interface', ['menu', 'emote', 'chat']]
+  ['Interface', ['menu', 'chat']]
 ];
 let KEYS = Object.assign({}, KEY_DEFAULTS);
 try { const s = JSON.parse(localStorage.getItem('vg_keys2d3') || 'null'); if (s) { for (const k in s) if (!(k in KEY_DEFAULTS)) delete s[k]; KEYS = Object.assign({}, KEY_DEFAULTS, s); } } catch (e) { }
@@ -852,7 +845,7 @@ function onIdentityChanged() {
   if (profileUnsub) profileUnsub(); if (friendsUnsub) friendsUnsub(); if (reqUnsub) reqUnsub();
   profileUnsub = friendsUnsub = reqUnsub = null;
   if (!me.guest) {
-    const pr = db.ref('profiles/' + me.id); const cb = pr.on('value', s => { const v = s.val(); if (v) { me.dollars = v.dollars || 0; if (v.name) me.name = v.name; me.skins = v.skins || {}; me.skin = v.skin || 'default'; me.fxs = v.fxs || {}; me.fx = v.fx || 'none'; me.model = v.model || 'boy'; me.models = v.models || {}; me.emotes = v.emotes || {}; me.wheel = v.wheel || {}; me.boxes = v.boxes || {}; me.traits = v.traits || {}; me.loadout = v.loadout || {}; me.stats = v.stats || {}; me.bts = v.bts || {}; me.btLoad = v.btLoad || {}; if (typeof onCosmeticsChanged === 'function') onCosmeticsChanged(); applyIdentityUI(); if (menuOpen()) showSection(menuSec); } });
+    const pr = db.ref('profiles/' + me.id); const cb = pr.on('value', s => { const v = s.val(); if (v) { me.dollars = v.dollars || 0; if (v.name) me.name = v.name; me.skins = v.skins || {}; me.skin = v.skin || 'default'; me.fxs = v.fxs || {}; me.fx = v.fx || 'none'; me.model = v.model || 'boy'; me.models = v.models || {}; me.emotes = v.emotes || {}; me.wheel = v.wheel || {}; me.boxes = v.boxes || {}; me.traits = v.traits || {}; me.loadout = v.loadout || {}; me.stats = v.stats || {}; me.bts = v.bts || {}; me.btLoad = v.btLoad || {}; if (!btSwept && typeof dedupeBts === 'function') { btSwept = true; setTimeout(dedupeBts, 0); } if (typeof onCosmeticsChanged === 'function') onCosmeticsChanged(); applyIdentityUI(); if (menuOpen()) showSection(menuSec); } });
     profileUnsub = () => pr.off('value', cb);
     const fr = db.ref('friends/' + me.id); const cb2 = fr.on('value', s => { me.friends = s.val() || {}; renderFriends(); });
     friendsUnsub = () => fr.off('value', cb2);
@@ -1030,8 +1023,9 @@ const POSES = {
   sit:         P2(-6, 4, 28, 58, 28, 58, 76, -76, 76, -76),
   lie:         P2(0, 6, 150, 20, 150, 20, 4, -10, 4, -10),
   toss:        P2(-4, -16, 160, 0, 15, 6, 0, 0, 0, 0),
+  approach:    P2(34, -22, -62, 12, -70, 16, 64, -92, 24, -48),          // the last step of the run-up: low, both arms thrown back
 };
-const POSE_SNAP = { jumpUp: 22, land: 20, spikeCharge: 26, spikeHit: 32, bump: 20 };
+const POSE_SNAP = { approach: 26, jumpUp: 22, land: 20, spikeCharge: 26, spikeHit: 32, bump: 20 };
 const JERSEY2 = { black: { shirt: '#1d1e25', trim: '#e5484d', shorts: '#15161b', num: '#ffffff', pad: '#d9383f', sock: '#1d1e25' }, white: { shirt: '#eef0f4', trim: '#2b5fd9', shorts: '#e3e6ec', num: '#2b2d35', pad: '#2b2d35', sock: '#f7f7f7' } };
 const HAIRS = [['#f1d27a', '#2a5fe0'], ['#e8843a', '#b85a1c'], ['#3a2a22', '#241812'], ['#dfe3ea', '#9aa3b2'], ['#1c1c24', '#35354a'], ['#c9924a', '#8a5a2a'], ['#f1d27a', '#d9a93a']];
 function lookFor(variant, model, hairIdx = 0) {
@@ -1785,7 +1779,7 @@ document.addEventListener('mousemove', e => { MOUSE.x = e.clientX; MOUSE.y = e.c
 document.addEventListener('keydown', e => {
   if (rebinding) { e.preventDefault(); setBind(e.code); return; }
   if (isTyping()) return;
-  if (e.code === 'Escape') { if (wheelOpen) return; if (!$('#openFx').classList.contains('hidden') || !$('#confirmBox').classList.contains('hidden')) closePanels(); else if (inMatch() && menuOpen()) closeMenu(); return; }
+  if (e.code === 'Escape') { if (!$('#openFx').classList.contains('hidden') || !$('#confirmBox').classList.contains('hidden')) closePanels(); else if (inMatch() && menuOpen()) closeMenu(); return; }
   if (e.code === KEYS.menu) { e.preventDefault(); if (!inMatch() || !$('#openFx').classList.contains('hidden')) return; menuOpen() ? closeMenu() : openMenu(); return; }
   if (e.code === KEYS.chat) { e.preventDefault(); $('#chatInput').focus(); return; }
   if (BOUND.has(e.code) || e.code === 'Tab' || e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
@@ -1808,15 +1802,13 @@ function inputAxes() { return { ix: clamp((keys.has(KEYS.moveR) ? 1 : 0) - (keys
 
 /* ---------------- Actions ---------------- */
 function onPress(code) {
-  if (code === KEYS.emote) { toggleWheel(); return; }
-  if (P.emote) stopEmote();
   if (code === KEYS.jump) tryJump();
   if (code === KEYS.serve) trySpawnBall(true);
   else if (code === KEYS.spawnBall) trySpawnBall(false);
   if (P.holding) { if (code === KEYS.toss) doToss(); return; }
   if (P.dive) return;
   if (P.onGround) {
-    if (P.cd > 0 || T < (P.landLock || 0)) return;
+    if (P.approach || P.cd > 0 || T < (P.landLock || 0)) return;
     if (code === KEYS.bump) doBump();
     else if (code === KEYS.groundSet) doGroundSet();
     else if (code === KEYS.dive) doDive();
@@ -1828,8 +1820,15 @@ function onPress(code) {
   }
 }
 function onRelease(code) { if (P.charging && code === KEYS.spike) releaseSpike(); }
+const APPROACH = 0.25;                               // the run-up before every jump: two steps, arms back, then up
 function tryJump() {
-  if (!P.onGround || P.dive || T < (P.landLock || 0)) return;
+  if (!P.onGround || P.dive || P.approach || T < (P.landLock || 0)) return;
+  if (P.holding) { doJump(); return; }
+  if (P.bumpHold) endBump();
+  P.approach = { t0: T, dir: P.f, stepped: 0 };
+}
+function doJump() {
+  P.approach = null;
   P.vy = jumpV(stat('jump')); P.onGround = false; P.airUsed = false;
   jumpFx(P.x, P.y, groundDustColor(), myPurple('jump'));
   P.jumpF = P.f; P.rig.base = P.holding ? 'hold' : 'air';
@@ -2115,9 +2114,14 @@ function updatePlayer(dt) {
     const e = (T - P.dive.t0) / P.dive.dur;
     if (e >= 1) { P.dive = null; P.cd = DIVE_CD; P.rig.pitchTarget = 0; P.diveAnim = 0; P.rig.setPose('idle'); P.rig.base = 'idle'; }
     else { P.vx = P.dive.dir * P.dive.v0 * (1 - e * 0.6); if (myPurple('dive') && Math.random() < 0.8) addPart({ kind: 'dot', x: P.x, y: P.y + 0.5 * PS, vx: -P.vx * 0.05, vy: 0.3, g: 0, drag: 3, life: 0.45, size: 0.16, col: Math.random() < 0.5 ? '#b25cff' : '#d9a8ff' }); }
+  } else if (P.onGround && P.approach) {
+    const e = T - P.approach.t0, d = P.approach.dir;
+    if (e >= APPROACH) { P.vx = d * MOVE_SPEED * speedMult(stat('speed')) * 0.55; doJump(); }
+    else if (e < APPROACH * 0.62) { P.vx = d * MOVE_SPEED * speedMult(stat('speed')) * 1.25; P.moving = true; P.moveDir = d; P.rig.runPhase += dt * 10;   // two quick steps
+      const st = e < APPROACH * 0.31 ? 1 : 2; if (st > P.approach.stepped) { P.approach.stepped = st; puff(P.x, P.y, 2, 0.6, 0.5, groundDustColor()); } }
+    else { P.vx = d * MOVE_SPEED * 0.5; P.moving = false; if (P.rig.anim !== 'approach') P.rig.setPose('approach'); }   // plant, arms thrown back
   } else if (P.onGround) {
-    if (P.emote && ix) stopEmote();
-    const mv = steering || P.emote ? 0 : ix;
+    const mv = steering ? 0 : ix;
     if (mv) { P.vx = mv * MOVE_SPEED * speedMult(stat('speed')) * (inRealMatch() ? staminaSpeed(teamStamina(P.team)) : 1) * (P.bumpHold ? 0.55 : 1); P.moveDir = Math.sign(mv); P.moving = true; }
     else { P.vx = 0; P.moving = false; }
   } else if (ix && !steering) {                                             // in the air you can still steer, a little slower than you run
@@ -2152,7 +2156,6 @@ function updatePlayer(dt) {
     if (P.act && P.act.type !== 'bump' && P.act.type !== 'set') P.act = null;
     landFx(P.x, P.y, groundDustColor());
   }
-  if (P.emote && T - P.emote.t0 > 6) stopEmote();
   P.rig.moveSpeed = P.onGround && !P.dive ? Math.abs(P.vx) : 0; P.rig.ready = true;
   P.rig.place(P.x, P.y, P.f, P.onGround && !P.dive);
   if (P.charging) P.charge = chargeAt(T - P.chargeStart);
@@ -2342,7 +2345,7 @@ function myState() {
    axes the keyboard drives). Round buttons press the same key codes the keyboard would. Buttons can be dragged
    anywhere in Menu > Settings > Controls > Edit layout; the layout is saved per device. */
 const TOUCH = { on: false, x: 0, y: 0, edit: false, joyId: null, joyOrigin: null, pressed: new Map(), layout: null, drag: null };
-const TOUCH_DEFAULT = { jump: [30, 110], action: [130, 40], q: [40, 212], e: [140, 150], dive: [230, 60], emote: [320, 26], menu: [320, 100], ball: [400, 26], serve: [470, 26] };   // [right, bottom] in px
+const TOUCH_DEFAULT = { jump: [30, 110], action: [130, 40], q: [40, 212], e: [140, 150], dive: [230, 60], menu: [320, 100], ball: [400, 26], serve: [470, 26] };   // [right, bottom] in px
 function touchWanted() { let pref = 'auto'; try { pref = localStorage.getItem('vg_touch') || 'auto'; } catch (e) { } if (pref === 'on') return true; if (pref === 'off') return false; const touch = 'ontouchstart' in window || navigator.maxTouchPoints > 0; return touch && (matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod|Mobile|CrOS.*Touch/i.test(navigator.userAgent)); }
 function applyTouch(on) {
   TOUCH.on = on; $('#touchUi').classList.toggle('hidden', !on); document.body.classList.toggle('touch', on);
@@ -2359,7 +2362,7 @@ function touchCode(act) {
     case 'action': return P.holding ? KEYS.toss : P.onGround ? KEYS.groundSet : KEYS.spike;
     case 'q': return P.onGround ? KEYS.bump : KEYS.block;
     case 'e': return KEYS.jumpSet;
-    case 'dive': return KEYS.dive; case 'emote': return KEYS.emote; case 'ball': return KEYS.spawnBall; case 'serve': return KEYS.serve;
+    case 'dive': return KEYS.dive; case 'ball': return KEYS.spawnBall; case 'serve': return KEYS.serve;
   } return null;
 }
 function updateTouchLabels() {
@@ -2368,13 +2371,13 @@ function updateTouchLabels() {
   const set = (act, text, show = true, dim = false) => { const b = $(`#touchUi .tbtn[data-act="${act}"]`); if (!b) return; if (!TOUCH.edit) b.style.display = show ? '' : 'none'; if (b.dataset.txt !== text) { b.dataset.txt = text; b.textContent = text; } b.classList.toggle('dim', dim && !TOUCH.edit); };
   set('action', hold ? 'TOSS' : ground ? 'SET' : 'SPIKE'); set('q', ground ? 'BUMP' : 'BLOCK');
   set('e', 'JUMP SET', true, ground); set('dive', 'DIVE', true, !ground);
-  set('ball', 'BALL', spawn); set('serve', 'SERVE', spawn); set('jump', 'JUMP', true, !ground); set('emote', 'EMOTE'); set('menu', 'MENU');
+  set('ball', 'BALL', spawn); set('serve', 'SERVE', spawn); set('jump', 'JUMP', true, !ground); set('menu', 'MENU');
 }
 (function initTouch() {
   const ui = $('#touchUi'); if (!ui) return;
   const joyZone = $('#joyZone'), joy = $('#joy'), knob = $('#joyKnob'); const R = 46;
   const joyMove = t => { const dx = t.clientX - TOUCH.joyOrigin.x, dy = t.clientY - TOUCH.joyOrigin.y; const d = Math.hypot(dx, dy), k = d > R ? R / d : 1; TOUCH.x = dx * k / R; TOUCH.y = -dy * k / R; if (Math.abs(TOUCH.x) < 0.2) TOUCH.x = 0; knob.style.transform = `translate(${dx * k}px,${dy * k}px)`; };
-  joyZone.addEventListener('touchstart', e => { e.preventDefault(); if (TOUCH.joyId !== null || wheelOpen) return; const t = e.changedTouches[0]; TOUCH.joyId = t.identifier; TOUCH.joyOrigin = { x: t.clientX, y: t.clientY }; joy.style.left = t.clientX + 'px'; joy.style.top = t.clientY + 'px'; joy.style.display = 'block'; knob.style.transform = ''; }, { passive: false });
+  joyZone.addEventListener('touchstart', e => { e.preventDefault(); if (TOUCH.joyId !== null) return; const t = e.changedTouches[0]; TOUCH.joyId = t.identifier; TOUCH.joyOrigin = { x: t.clientX, y: t.clientY }; joy.style.left = t.clientX + 'px'; joy.style.top = t.clientY + 'px'; joy.style.display = 'block'; knob.style.transform = ''; }, { passive: false });
   const joyEnd = e => { for (const t of e.changedTouches) if (t.identifier === TOUCH.joyId) { TOUCH.joyId = null; TOUCH.x = TOUCH.y = 0; joy.style.display = 'none'; } };
   joyZone.addEventListener('touchmove', e => { e.preventDefault(); for (const t of e.changedTouches) if (t.identifier === TOUCH.joyId) joyMove(t); }, { passive: false });
   joyZone.addEventListener('touchend', joyEnd); joyZone.addEventListener('touchcancel', joyEnd);
@@ -2386,7 +2389,6 @@ function updateTouchLabels() {
       if (!$('#openFx').classList.contains('hidden')) return;
       const code = touchCode(b.dataset.act); if (!code) return;
       if (menuOpen() && code !== KEYS.jump) return;
-      if (b.dataset.act === 'emote' && e.changedTouches) wheelOpenTouch = e.changedTouches[0].identifier;
       TOUCH.pressed.set(b, code); b.classList.add('on'); if (!keys.has(code)) { keys.add(code); onPress(code); }
     };
     const release = e => { e.preventDefault(); e.stopPropagation(); b.classList.remove('on'); const code = TOUCH.pressed.get(b); if (code === undefined) return; TOUCH.pressed.delete(b); if (keys.has(code)) { keys.delete(code); onRelease(code); } };
@@ -2418,18 +2420,19 @@ function camKick(zoom, shake) { camKickK = clamp(camKickK + zoom, -0.2, 0.2); ca
 function updateCamera(dt) {
   camKickK *= Math.exp(-dt * 7); camShake *= Math.exp(-dt * 9);
   if (S.scene === 'match') {
-    /* The camera sits halfway between you and the ball (equal pull), and pulls back the further apart they are.
+    /* The camera sits between you and the ball (you pull harder), and pulls back the further apart they are.
        It rises to follow a high ball but never drops below the floor framing; sideways it follows you everywhere. */
     const cd = courtDims(), b = matchBall(); const live = b && b.active && !b.held;
     const bx = live ? b.x : P.x, by = live ? b.y : P.y;
-    const needW = Math.max(CAM_MIN_W, Math.abs(bx - P.x) + 12), needH = Math.max(CAM_MIN_H, Math.abs(by - P.y) + 7);
+    const BP = 0.3;                                                       // the ball's pull: 30%, you 70%
+    const needW = Math.max(CAM_MIN_W, Math.abs(bx - P.x) * 0.6 + 12), needH = Math.max(CAM_MIN_H, Math.abs(by - P.y) * 0.6 + 7);
     const want = Math.max(Math.min(VW / needW, VH / needH), Math.min(VW / (2 * cd.wall), VH / 60));   // never further out than the whole hall
     camZoom = camZoom ? camZoom + (want - camZoom) * smoothT(3, dt) : want;
     const s = camZoom * (1 + camKickK * 0.25); CAM.s = s;
     const baseY = 0.24 * VH / s;                                          // the floor framing: players three quarters of the way down
-    const wantY = Math.max(baseY, (P.y + by) / 2 + 1.5);
+    const wantY = Math.max(baseY, P.y + (by - P.y) * BP + 1.5);
     camY = camY ? camY + (wantY - camY) * smoothT(5, dt) : wantY; CAM.y = Math.max(baseY, camY);
-    const hw = VW / 2 / s; const wantX = clamp((P.x + bx) / 2, -Math.max(0, cd.wall - hw), Math.max(0, cd.wall - hw));
+    const hw = VW / 2 / s; const wantX = clamp(P.x + (bx - P.x) * BP, -Math.max(0, cd.wall - hw), Math.max(0, cd.wall - hw));
     camScrollX += (wantX - camScrollX) * smoothT(6, dt); CAM.x = camScrollX;
   }
   if (camShake > 0.002) { const st = performance.now() * 0.001; shakeX = Math.sin(st * 47) * camShake * 10; shakeY = Math.sin(st * 61 + 1.7) * camShake * 10; } else { shakeX = shakeY = 0; }
@@ -2459,7 +2462,6 @@ let shopTab = 'skins';
 const SHOP_KINDS = {
   skins:  { items: SKINS, icon: 'skin_', owned: () => me.skins, cur: () => me.skin, def: 'default', ownedKey: 'skins', curKey: 'skin', note: 'Ball skins. Same size, same hitbox - looks only.' },
   fx:     { items: FXS, icon: 'fx_', owned: () => me.fxs, cur: () => me.fx, def: 'none', ownedKey: 'fxs', curKey: 'fx', note: 'Score effects play where a ball you hit lands in, across the net.' },
-  emotes: { items: EMOTES, icon: 'emote_', owned: () => me.emotes, cur: () => null, def: null, ownedKey: 'emotes', curKey: null, note: 'Equipped emotes go on your emote wheel (8 slots).', multi: true },
 };
 $$('#shopTabs button').forEach(b => b.onclick = () => { shopTab = b.dataset.tab; renderShop(); });
 function renderShop() {
@@ -2471,12 +2473,11 @@ function renderShop() {
   const K = SHOP_KINDS[shopTab]; $('#shopNote').textContent = K.note + (me.guest ? ' (Log in to buy.)' : '');
   const ownedMap = K.owned() || {}; const cur = K.cur();
   const ids = Object.keys(K.items).sort((a, b) => (RARITY_ORDER[K.items[a].rarity] - RARITY_ORDER[K.items[b].rarity]) || (K.items[a].price - K.items[b].price));
-  const onWheel = K.multi ? wheelSlots() : [];
   for (const id of ids) {
-    const it = K.items[id]; const free = !it.price; const owned = free || !!ownedMap[id]; const eq = K.multi ? onWheel.includes(id) : cur === id;
+    const it = K.items[id]; const free = !it.price; const owned = free || !!ownedMap[id]; const eq = cur === id;
     const d = document.createElement('div'); d.className = 'item b-' + it.rarity + (owned ? ' owned' : '') + (eq ? ' equipped' : '');
     d.innerHTML = `<img src="${ICONS[K.icon + id] || ''}" alt=""><div class="nm">${it.name}</div><div class="rar r-${it.rarity}">${it.rarity}</div><div class="pr">${free ? 'FREE' : owned ? 'OWNED' : '$' + it.price.toLocaleString()}</div><button>${eq ? 'EQUIPPED' : owned ? 'EQUIP' : 'BUY'}</button>`;
-    d.querySelector('button').onclick = () => owned ? (K.multi ? equipEmote(id) : equipItem(shopTab, eq ? K.def : id)) : buyItem(shopTab, id);
+    d.querySelector('button').onclick = () => owned ? equipItem(shopTab, eq ? K.def : id) : buyItem(shopTab, id);
     grid.appendChild(d);
   }
 }
@@ -2515,12 +2516,32 @@ let opening = false;
 async function buyBreakthrough(n = 1) {
   if (me.guest) { toast('Log in to open breakthroughs (Settings > Account)', 'err'); return; }
   if (opening) return; opening = true;
-  const rolls = []; for (let i = 0; i < n; i++) rolls.push(rollBreakthrough()); const price = BT_COST * n;
-  const res = await db.ref('profiles/' + me.id).transaction(pr => { if (!pr) return pr; if ((pr.dollars || 0) < price) return; pr.dollars = (pr.dollars || 0) - price; pr.bts = pr.bts || {}; rolls.forEach((bt, i) => { pr.bts['k' + Date.now().toString(36) + i + rnd()] = bt; }); return pr; });
+  const rolls = []; for (let i = 0; i < n; i++) rolls.push(rollBreakthrough()); const price = BT_COST * n; let dups = 0;
+  const res = await db.ref('profiles/' + me.id).transaction(pr => { if (!pr) return pr; if ((pr.dollars || 0) < price) return; pr.dollars = (pr.dollars || 0) - price; pr.bts = pr.bts || {}; rolls.forEach((bt, i) => { pr.bts['k' + Date.now().toString(36) + i + rnd()] = bt; }); dups = dedupeInto(pr); return pr; });
   if (!res.committed) { opening = false; toast(`Not enough dollars ($${price.toLocaleString()} needed)`, 'err'); return; }
-  playOpen(rolls);
+  playOpen(rolls); if (dups) setTimeout(() => toast(`${dups} duplicate${dups > 1 ? 's' : ''} auto-deleted (+$${(dups * BT_DUP_REFUND).toLocaleString()})`, 'ok'), 2000);
 }
 const btRank = bt => BT_RARITY.indexOf(bt.r) * 100 + (bt.v || 0);
+const BT_DUP_REFUND = Math.floor(BT_COST * 0.75);
+const btKind = bt => bt.r === 'X' ? 'X:' + bt.ab : bt.r + ':' + bt.stat;   // same rarity and same stat (or the same ability) = a duplicate
+function dedupeInto(pr) {                          // inside a profile transaction: keep the best of each kind, refund the rest; returns how many went
+  const own = pr.bts || {}; const best = {}; let n = 0; const lo = pr.btLoad || {};
+  const worn = k => [0, 1, 2].some(i => lo[i] === k);
+  for (const k in own) { const bt = own[k]; if (!bt) continue; const kind = btKind(bt), cur = best[kind];
+    if (!cur) { best[kind] = k; continue; }
+    const a = own[cur]; const keepNew = (bt.v || 0) > (a.v || 0) || ((bt.v || 0) === (a.v || 0) && worn(k) && !worn(cur));
+    const drop = keepNew ? cur : k; if (keepNew) best[kind] = k;
+    for (const i of [0, 1, 2]) if (lo[i] === drop) lo[i] = best[kind];      // an equipped duplicate hands its slot to the one that stays
+    own[drop] = null; n++;
+  }
+  if (n) { pr.dollars = (pr.dollars || 0) + n * BT_DUP_REFUND; pr.btLoad = lo; }
+  return n;
+}
+async function dedupeBts() {
+  if (me.guest || !me.bts) return; let n = 0;
+  const res = await db.ref('profiles/' + me.id).transaction(pr => { if (!pr || !pr.bts) return pr; n = dedupeInto(pr); return n ? pr : undefined; });
+  if (res.committed && n) toast(`${n} duplicate breakthrough${n > 1 ? 's' : ''} removed (+$${(n * BT_DUP_REFUND).toLocaleString()})`, 'ok');
+}
 function playOpen(list) {                           // every box rattles and bursts; only the best breakthrough is thrown out as a card
   if (!Array.isArray(list)) list = [list];
   const best = list.reduce((a, b) => btRank(b) > btRank(a) ? b : a, list[0]); const n = list.length;
@@ -2575,24 +2596,24 @@ function renderInventory() {
   $('#invMain').classList.toggle('hidden', bts); $('#invTraits').classList.toggle('hidden', !bts);
   if (bts) { renderBtTab(); return; }
   const K = SHOP_KINDS[invTab]; if (!K) { invTab = 'skins'; return renderInventory(); }
-  const ownedMap = K.owned() || {}; const cur = K.cur(); const onWheel = K.multi ? wheelSlots() : [];
+  const ownedMap = K.owned() || {}; const cur = K.cur();
   const ids = Object.keys(K.items).filter(id => !K.items[id].price || ownedMap[id]).sort((a, b) => (RARITY_ORDER[K.items[a].rarity] - RARITY_ORDER[K.items[b].rarity]) || (K.items[a].price - K.items[b].price));
   const grid = $('#invGrid'); grid.innerHTML = '';
   if (!ids.length) grid.innerHTML = `<div id="invEmpty">Nothing here yet - see the Shop.</div>`;
   if (invSel && !ids.includes(invSel)) invSel = null;
-  if (!invSel) invSel = ids.find(id => K.multi ? onWheel.includes(id) : cur === id) || ids[0] || null;
+  if (!invSel) invSel = ids.find(id => cur === id) || ids[0] || null;
   for (const id of ids) {
-    const it = K.items[id]; const eq = K.multi ? onWheel.includes(id) : cur === id;
+    const it = K.items[id]; const eq = cur === id;
     const d = document.createElement('div'); d.className = 'tile b-' + it.rarity + (id === invSel ? ' sel' : '');
     d.innerHTML = `<img src="${ICONS[K.icon + id] || ''}" alt="">${eq ? '<div class="eqp">EQUIPPED</div>' : ''}`;
     d.title = it.name; d.onclick = () => { invSel = id; renderInventory(); }; grid.appendChild(d);
   }
   const det = $('#invDetail'); det.classList.toggle('none', !invSel);
   if (!invSel) { det.innerHTML = 'Select an item'; return; }
-  const it = K.items[invSel]; const eq = K.multi ? onWheel.includes(invSel) : cur === invSel;
-  det.innerHTML = `<div class="nm">${it.name}</div><img src="${ICONS[K.icon + invSel] || ''}" alt=""><div class="rar r-${it.rarity}">${it.rarity}</div><div class="desc">${it.price ? 'Bought for $' + it.price.toLocaleString() : 'Free for everyone'}</div><button class="btn ${eq ? 'red' : 'green'}">${K.multi ? (eq ? 'REMOVE FROM WHEEL' : 'ADD TO WHEEL') : (eq ? (invSel === K.def ? 'EQUIPPED' : 'UNEQUIP') : 'EQUIP')}</button>`;
-  const btn = det.querySelector('button'); if (!K.multi && eq && invSel === K.def) btn.disabled = true;
-  btn.onclick = () => K.multi ? equipEmote(invSel) : equipItem(invTab, eq ? K.def : invSel);
+  const it = K.items[invSel]; const eq = cur === invSel;
+  det.innerHTML = `<div class="nm">${it.name}</div><img src="${ICONS[K.icon + invSel] || ''}" alt=""><div class="rar r-${it.rarity}">${it.rarity}</div><div class="desc">${it.price ? 'Bought for $' + it.price.toLocaleString() : 'Free for everyone'}</div><button class="btn ${eq ? 'red' : 'green'}">${eq ? (invSel === K.def ? 'EQUIPPED' : 'UNEQUIP') : 'EQUIP'}</button>`;
+  const btn = det.querySelector('button'); if (eq && invSel === K.def) btn.disabled = true;
+  btn.onclick = () => equipItem(invTab, eq ? K.def : invSel);
 }
 function onInventoryChanged() { if (menuOpen() && menuSec === 'inventory') renderInventory(); }
 function renderBtTab() {
@@ -2611,23 +2632,29 @@ function renderBtTab() {
 /* ---------------- Stats (in the menu) ---------------- */
 function renderStats() {
   const list = $('#statList'); list.innerHTML = '';
-  $('#statNote').textContent = me.guest ? 'Log in to buy stat points.' : `$${STAT_COST} a point, up to ${STAT_BUY_MAX} per stat. Breakthroughs add on top - reach 100 to unlock the stat's purple effect.`;
+  $('#statNote').textContent = me.guest ? 'Log in to buy stat points.' : `$${STAT_COST} a point, up to ${STAT_BUY_MAX} per stat (take points out any time for a full refund). Breakthroughs add on top - reach 100 to unlock the stat's purple effect.`;
   for (const k of STAT_KEYS) {
     const [name, desc, purple] = STAT_INFO[k]; const base = statBase(k), bonus = statBonus(k), eff = base + bonus;
     const d = document.createElement('div'); d.className = 'stat' + (eff >= 100 ? ' maxed' : '');
     d.innerHTML = `<div class="sn">${name}</div>
       <div class="sbar"><i style="width:${Math.min(100, base)}%"></i><em style="left:${Math.min(100, base)}%;width:${Math.max(0, Math.min(100, eff) - Math.min(100, base))}%"></em><s style="left:50%"></s></div>
       <div class="sv"><b>${base}/${STAT_BUY_MAX}</b>${bonus ? ` <span class="bonus">(+${bonus})</span>` : ''}<small>acts as ${eff}</small></div>
-      <div class="sb"><button data-k="${k}" data-n="1" ${base >= STAT_BUY_MAX || me.guest ? 'disabled' : ''}>+1 $${STAT_COST}</button><button data-k="${k}" data-n="5" ${base >= STAT_BUY_MAX || me.guest ? 'disabled' : ''}>+5</button></div>`;
+      <div class="sb"><button data-k="${k}" data-n="1" ${base >= STAT_BUY_MAX || me.guest ? 'disabled' : ''}>+1 $${STAT_COST}</button><button data-k="${k}" data-n="5" ${base >= STAT_BUY_MAX || me.guest ? 'disabled' : ''}>+5</button><button class="minus" data-k="${k}" data-n="-1" ${base <= 0 || me.guest ? 'disabled' : ''}>-1</button><button class="minus" data-k="${k}" data-n="-5" ${base <= 0 || me.guest ? 'disabled' : ''}>-5</button></div>`;
     list.appendChild(d);
   }
   const bts = btEquipped(); $('#statBts').innerHTML = bts.length ? bts.map(bt => `<span class="chip" style="--rc:${BT_COLOR[bt.r]}"><b>${bt.r}</b> ${esc(btLabel(bt))}</span>`).join('') : '<span class="dim">No breakthroughs equipped.</span>';
-  $$('#statList button[data-k]').forEach(b => b.onclick = () => buyStat(b.dataset.k, +b.dataset.n));
+  $$('#statList button[data-k]').forEach(b => b.onclick = () => +b.dataset.n > 0 ? buyStat(b.dataset.k, +b.dataset.n) : sellStat(b.dataset.k, -b.dataset.n));
 }
 async function buyStat(k, n) {
   if (me.guest) return; const have = statBase(k); n = Math.min(n, STAT_BUY_MAX - have); if (n <= 0) return; const price = n * STAT_COST;
   const res = await db.ref('profiles/' + me.id).transaction(pr => { if (!pr) return pr; if ((pr.dollars || 0) < price) return; const st = pr.stats = pr.stats || {}; const cur = Math.floor(st[k] || 0); if (cur + n > STAT_BUY_MAX) return; st[k] = cur + n; pr.dollars -= price; return pr; });
   if (!res.committed) toast(`Not enough dollars ($${price.toLocaleString()} needed)`, 'err'); else toast(`${STAT_INFO[k][0]} +${n}`, 'ok');
+}
+
+async function sellStat(k, n) {                    // take points back out: every dollar is refunded
+  if (me.guest) return; n = Math.min(n, statBase(k)); if (n <= 0) return;
+  const res = await db.ref('profiles/' + me.id).transaction(pr => { if (!pr) return pr; const st = pr.stats = pr.stats || {}; const cur = Math.floor(st[k] || 0); const m = Math.min(n, cur); if (m <= 0) return; st[k] = cur - m; pr.dollars = (pr.dollars || 0) + m * STAT_COST; return pr; });
+  if (res.committed) toast(`${STAT_INFO[k][0]} -${n} (+$${(n * STAT_COST).toLocaleString()})`, 'ok');
 }
 
 /* ---------------- Quests (placeholder until they are real) ---------------- */
@@ -2641,35 +2668,6 @@ const QUESTS = [
 function renderQuests() {
   $('#questList').innerHTML = '<div class="pane" style="font-weight:800;font-size:13px">Daily quests will reset every day at midnight EST. They are not live yet - here is what is coming.</div>' +
     QUESTS.map(([ic, t, d, p, n, r]) => `<div class="quest"><div class="qi">${ic}</div><div style="flex:1"><div class="qt">${t}</div><div class="qd">${d}</div><div class="qb"><i style="width:${(p / n * 100).toFixed(0)}%"></i></div></div><div class="qr">${r}<br><small style="opacity:.6">${p}/${n}</small></div></div>`).join('');
-}
-
-/* ---------------- Emotes + wheel ---------------- */
-let wheelOpen = false, wheelSel = -1;
-function startEmote(id) { if (!EMOTES[id] || !P.onGround || P.dive || P.holding) return; P.emote = { id, t0: T }; P.rig.emote = id; P.rig.emoteT = 0; P.rig.setPose('idle'); P.rig.base = 'idle'; }
-function stopEmote() { if (!P.emote) return; P.emote = null; P.rig.emote = null; P.rig.pitchTarget = 0; }
-function wheelSlots() { const out = []; for (let i = 0; i < 8; i++) out.push(me.wheel && me.wheel[i] && EMOTES[me.wheel[i]] ? me.wheel[i] : null); return out; }
-function toggleWheel() { wheelOpen ? closeWheel(false) : openWheel(); }
-function openWheel() {
-  if (uiOpen()) return;
-  wheelOpen = true; wheelSel = -1; const w = $('#emoteWheel'); w.classList.remove('hidden');
-  w.querySelectorAll('.slot').forEach(e => e.remove());
-  const slots = wheelSlots();
-  for (let i = 0; i < 8; i++) { const a = -Math.PI / 2 + i * Math.PI / 4; const el = document.createElement('div'); el.className = 'slot'; el.style.left = (180 + Math.cos(a) * 130) + 'px'; el.style.top = (180 + Math.sin(a) * 130) + 'px'; el.innerHTML = slots[i] ? `${EMOTES[slots[i]].name}` : `<small>empty</small>`; w.appendChild(el); }
-}
-function closeWheel(play) { if (!wheelOpen) return; wheelOpen = false; $('#emoteWheel').classList.add('hidden'); if (play && wheelSel >= 0) { const id = wheelSlots()[wheelSel]; if (id) startEmote(id); } }
-const wheelPick = (x, y) => { const dx = x - innerWidth / 2, dy = y - innerHeight / 2; const dist = Math.hypot(dx, dy); wheelSel = dist < 40 ? -1 : ((Math.round((Math.atan2(dy, dx) + Math.PI / 2) / (Math.PI / 4)) % 8) + 8) % 8; $$('#emoteWheel .slot').forEach((el, i) => el.classList.toggle('sel', i === wheelSel)); };
-document.addEventListener('mousemove', e => { if (wheelOpen) wheelPick(e.clientX, e.clientY); });
-document.addEventListener('mousedown', e => { if (wheelOpen && e.button === 0) { e.preventDefault(); e.stopPropagation(); closeWheel(true); } }, true);
-let wheelOpenTouch = null;
-document.addEventListener('touchstart', e => { if (!wheelOpen) return; if ([...e.changedTouches].some(t => t.identifier === wheelOpenTouch)) return; e.preventDefault(); wheelPick(e.touches[0].clientX, e.touches[0].clientY); }, { capture: true, passive: false });
-document.addEventListener('touchmove', e => { if (!wheelOpen) return; e.preventDefault(); wheelPick(e.touches[0].clientX, e.touches[0].clientY); }, { capture: true, passive: false });
-document.addEventListener('touchend', e => { if (!wheelOpen) return; if ([...e.changedTouches].some(t => t.identifier === wheelOpenTouch)) { wheelOpenTouch = null; return; } e.preventDefault(); closeWheel(true); }, { capture: true, passive: false });
-document.addEventListener('keydown', e => { if (wheelOpen && e.code === 'Escape') closeWheel(false); }, true);
-function equipEmote(id) {
-  const wheel = Object.assign({}, me.wheel || {}); const slots = wheelSlots(); const idx = slots.indexOf(id);
-  if (idx >= 0) delete wheel[idx]; else { const free = slots.indexOf(null); if (free < 0) { toast('Wheel is full - remove an emote first', 'err'); return; } wheel[free] = id; }
-  if (me.guest) { me.wheel = wheel; renderShop(); onInventoryChanged(); return; }
-  db.ref('profiles/' + me.id + '/wheel').set(wheel);
 }
 
 /* ---------------- Chat (global + party) ---------------- */
@@ -2963,7 +2961,7 @@ function resetToSpawn() {                       // back to your starting spot (m
   const M = S.match; if (!M) return;
   const mates = Object.keys(M.teams[P.team] || {}).sort(); const idx = Math.max(0, mates.indexOf(SID));
   P.x = M.practice ? -4 : spawnX(P.team, idx, mates.length); P.y = 0; P.vx = P.vy = 0; P.onGround = true; P.f = P.team === 'A' ? 1 : -1;
-  P.holding = false; P.serveMode = false; P.serveAim = null; P.dive = null; P.dash = null; P.glide = null; P.charging = false; P.airUsed = false; P.act = null; P.bumpHold = false; P.swingAt = 0; P.onStairs = false;
+  P.holding = false; P.serveMode = false; P.serveAim = null; P.dive = null; P.dash = null; P.glide = null; P.charging = false; P.airUsed = false; P.act = null; P.bumpHold = false; P.approach = null; P.swingAt = 0; P.onStairs = false;
   if (P.rig) { P.rig.base = 'idle'; P.rig.setPose('idle'); P.rig.pitchTarget = 0; }
 }
 async function enterMatch(mid) {
@@ -3387,6 +3385,23 @@ function drawBubbles(sid, sx, sy) {
   }
   C.globalAlpha = 1; return y;
 }
+/* Your highest spike contact: the top of your jump, your arm up, and the Spike stat's reach. */
+const myMaxHitH = () => jumpV(stat('jump')) ** 2 / (2 * G) + 1.92 * PS + spikeReach(stat('spike'));
+/* On a set to your team (any set in practice) a ring pulses on the path where the ball comes down through your
+   highest contact - hit it there. A set that never gets that high is marked at its peak. */
+function drawHitMark(b) {
+  const M = S.match; if (!M || !b.path) return;
+  if (!M.practice && teamOf(b.hitter) !== P.team) return;
+  const p = b.path; if (b.markFor !== p) {
+    b.markFor = p; const H = myMaxHitH(); let top = 0; for (let i = 1; i < p.length; i++) if (p[i][1] > p[top][1]) top = i;
+    let mi = top; if (p[top][1] > H) { for (let i = top; i < p.length; i++) if (p[i][1] <= H) { mi = i; break; } }
+    b.markI = mi;
+  }
+  if (b.pathI > b.markI) return;                                           // the ball has gone past it
+  const [x, y] = p[b.markI]; const k = (T * 1.6) % 1, pulse = 0.55 + 0.12 * Math.sin(T * 9);
+  C.save(); ellipse(x, y, pulse, pulse, 0, null, 'rgba(255,255,255,.95)', 0.1);
+  ellipse(x, y, pulse + k * 1.1, pulse + k * 1.1, 0, null, `rgba(255,255,255,${(0.7 * (1 - k)).toFixed(3)})`, 0.07); C.restore();
+}
 function rrScreen(x, y, w, h, r, fill) { C.beginPath(); C.moveTo(x + r, y); C.arcTo(x + w, y, x + w, y + h, r); C.arcTo(x + w, y + h, x, y + h, r); C.arcTo(x, y + h, x, y, r); C.arcTo(x, y, x + w, y, r); C.closePath(); C.fillStyle = fill; C.fill(); }
 function render(dt) {
   C = ctx; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
@@ -3406,6 +3421,7 @@ function render(dt) {
     while (b.pathI < p.length - 1 && Math.hypot(p[b.pathI + 1][0] - b.x, p[b.pathI + 1][1] - b.y) < Math.hypot(p[b.pathI][0] - b.x, p[b.pathI][1] - b.y)) b.pathI++;
     C.save(); C.setLineDash([0.25, 0.3]); C.lineCap = 'round'; C.beginPath(); C.moveTo(b.x, b.y); for (let i = b.pathI + 1; i < p.length; i++) C.lineTo(p[i][0], p[i][1]);
     C.strokeStyle = 'rgba(255,255,255,.85)'; C.lineWidth = 0.09; C.stroke(); C.setLineDash([]); const e = p[p.length - 1]; ellipse(e[0], 0.03, 0.5, 0.12, 0, null, 'rgba(255,255,255,.8)', 0.06); C.restore();
+    drawHitMark(b);
   }
   for (const b of balls.values()) { if (b.scene !== S.scene || !b.active) continue; const x = b.x + b.visX, y = b.y + b.visY; if (!onScreen(x - 1, x + 1)) continue; ellipse(x, ballFloor(b) + 0.02, 0.32 * clamp(1 - (y - ballFloor(b)) * 0.05, 0.3, 1), 0.07, 0, `rgba(0,0,0,${clamp(0.3 - y * 0.02, 0.06, 0.3)})`); drawBallSkin(x, y, b.skin, b.rot, T, BALL_R, !b.held && b.hitter === SID && b.hitType !== 'toss'); }
   drawMarks(dt); drawParts(); drawFx('mid');

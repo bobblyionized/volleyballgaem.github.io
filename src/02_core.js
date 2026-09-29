@@ -93,32 +93,33 @@ const S = { online: false, scene: 'menu', padId: null, queue: null, match: null,
 const SID = 's' + rnd() + Date.now().toString(36);   // unique per tab
 const me = { sid: SID, id: SID, name: 'Guest', guest: true, dollars: 0, friends: {}, requests: {}, lower: null, skins: {}, skin: 'default', fxs: {}, fx: 'none', model: 'boy', models: {}, emotes: {}, wheel: {}, boxes: {}, traits: {}, loadout: {}, stats: {}, bts: {}, btLoad: {} };
 
+let btSwept = false;                         // duplicate breakthroughs are cleared once per session, when the profile first loads
 /* ---------------- Keybinds ---------------- */
 /* Every control the game reads goes through KEYS. In 2D: A / D run, W / S aim (spike, block, bump strength,
    jump set) and climb onto / drop off the stairs. Escape always closes the menu on top of whatever it is bound to. */
 const KEY_DEFAULTS = {
   moveL: 'KeyA', moveR: 'KeyD',
   block: 'KeyQ', bump: 'Space', dive: 'ControlLeft', jumpSet: 'KeyE',
-  groundSet: 'Mouse0', spike: 'Space', toss: 'Mouse0', spawnBall: 'KeyG', serve: 'Digit1', jump: 'KeyW', emote: 'KeyB',
+  groundSet: 'Mouse0', spike: 'Space', toss: 'Mouse0', spawnBall: 'KeyG', serve: 'Digit1', jump: 'KeyW',
   chat: 'Slash', menu: 'KeyM'
 };
 // mirrored to the right of the keyboard, for players who hold the mouse in their left hand
 const KEY_LEFTY = {
   moveL: 'ArrowLeft', moveR: 'ArrowRight',
   block: 'KeyP', bump: 'ShiftRight', dive: 'ControlRight', jumpSet: 'KeyO',
-  groundSet: 'Mouse0', spike: 'ShiftRight', toss: 'Mouse0', spawnBall: 'KeyL', serve: 'Digit0', jump: 'ArrowUp', emote: 'Semicolon',
+  groundSet: 'Mouse0', spike: 'ShiftRight', toss: 'Mouse0', spawnBall: 'KeyL', serve: 'Digit0', jump: 'ArrowUp',
   chat: 'Slash', menu: 'KeyM'
 };
 const KEY_LABELS = {
   moveL: 'Run Left', moveR: 'Run Right',
   block: 'Block', bump: 'Bump (hold)', dive: 'Dive', jumpSet: 'Jump Set', groundSet: 'Ground Set',
-  spike: 'Spike', toss: 'Toss / Serve toss', spawnBall: 'Spawn Ball (practice)', serve: 'Serve (practice)', jump: 'Jump', emote: 'Emote Wheel',
+  spike: 'Spike', toss: 'Toss / Serve toss', spawnBall: 'Spawn Ball (practice)', serve: 'Serve (practice)', jump: 'Jump',
   chat: 'Chat', menu: 'Menu'
 };
 const KEY_GROUPS = [
   ['Movement', ['moveL', 'moveR', 'jump', 'dive']],
   ['Ball', ['bump', 'groundSet', 'jumpSet', 'block', 'spike', 'toss', 'serve', 'spawnBall']],
-  ['Interface', ['menu', 'emote', 'chat']]
+  ['Interface', ['menu', 'chat']]
 ];
 let KEYS = Object.assign({}, KEY_DEFAULTS);
 try { const s = JSON.parse(localStorage.getItem('vg_keys2d3') || 'null'); if (s) { for (const k in s) if (!(k in KEY_DEFAULTS)) delete s[k]; KEYS = Object.assign({}, KEY_DEFAULTS, s); } } catch (e) { }
@@ -341,7 +342,7 @@ function onIdentityChanged() {
   if (profileUnsub) profileUnsub(); if (friendsUnsub) friendsUnsub(); if (reqUnsub) reqUnsub();
   profileUnsub = friendsUnsub = reqUnsub = null;
   if (!me.guest) {
-    const pr = db.ref('profiles/' + me.id); const cb = pr.on('value', s => { const v = s.val(); if (v) { me.dollars = v.dollars || 0; if (v.name) me.name = v.name; me.skins = v.skins || {}; me.skin = v.skin || 'default'; me.fxs = v.fxs || {}; me.fx = v.fx || 'none'; me.model = v.model || 'boy'; me.models = v.models || {}; me.emotes = v.emotes || {}; me.wheel = v.wheel || {}; me.boxes = v.boxes || {}; me.traits = v.traits || {}; me.loadout = v.loadout || {}; me.stats = v.stats || {}; me.bts = v.bts || {}; me.btLoad = v.btLoad || {}; if (typeof onCosmeticsChanged === 'function') onCosmeticsChanged(); applyIdentityUI(); if (menuOpen()) showSection(menuSec); } });
+    const pr = db.ref('profiles/' + me.id); const cb = pr.on('value', s => { const v = s.val(); if (v) { me.dollars = v.dollars || 0; if (v.name) me.name = v.name; me.skins = v.skins || {}; me.skin = v.skin || 'default'; me.fxs = v.fxs || {}; me.fx = v.fx || 'none'; me.model = v.model || 'boy'; me.models = v.models || {}; me.emotes = v.emotes || {}; me.wheel = v.wheel || {}; me.boxes = v.boxes || {}; me.traits = v.traits || {}; me.loadout = v.loadout || {}; me.stats = v.stats || {}; me.bts = v.bts || {}; me.btLoad = v.btLoad || {}; if (!btSwept && typeof dedupeBts === 'function') { btSwept = true; setTimeout(dedupeBts, 0); } if (typeof onCosmeticsChanged === 'function') onCosmeticsChanged(); applyIdentityUI(); if (menuOpen()) showSection(menuSec); } });
     profileUnsub = () => pr.off('value', cb);
     const fr = db.ref('friends/' + me.id); const cb2 = fr.on('value', s => { me.friends = s.val() || {}; renderFriends(); });
     friendsUnsub = () => fr.off('value', cb2);

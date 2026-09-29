@@ -85,8 +85,8 @@ input:focus,select:focus{border-color:var(--yellow)}
 #modeTxt{position:absolute;top:80px;left:50%;transform:translateX(-50%);font-size:11px;opacity:.75;font-style:italic;font-weight:800;white-space:nowrap}
 #spikeInfo{position:absolute;top:100px;left:50%;transform:translateX(-50%);display:flex;gap:46px;pointer-events:none;opacity:0;transition:opacity .35s;white-space:nowrap}
 #spikeInfo.on{opacity:1;transition:opacity .08s}
-#spikeInfo div{font-size:44px;font-weight:900;color:#fff;letter-spacing:-1px;text-shadow:0 3px 0 rgba(0,0,0,.35),0 0 14px rgba(0,0,0,.25)}
-#spikeInfo small{font-size:24px;font-weight:800;margin-left:3px;opacity:.95}
+#spikeInfo div{font-size:33px;font-weight:900;color:#fff;letter-spacing:-1px;text-shadow:0 3px 0 rgba(0,0,0,.35),0 0 14px rgba(0,0,0,.25)}
+#spikeInfo small{font-size:18px;font-weight:800;margin-left:3px;opacity:.95}
 #touches{position:absolute;top:158px;left:50%;transform:translateX(-50%);display:flex;gap:6px}
 #touches i{width:12px;height:12px;border-radius:3px;background:rgba(0,0,0,.35);border:2px solid #fff}
 #touches i.on{background:var(--yellow)}
@@ -100,12 +100,6 @@ input:focus,select:focus{border-color:var(--yellow)}
 #loadBar{width:320px;max-width:80vw;height:14px;border:3px solid #fff;border-radius:3px;background:rgba(20,40,90,.25);margin-top:14px;overflow:hidden}
 #loadBar i{display:block;height:100%;width:0;background:var(--orange);transition:width .25s}
 #loadPct{font-size:12px;font-weight:900;font-style:normal;margin-top:6px;color:#1b2b55;text-shadow:none}
-/* emote wheel */
-#emoteWheel{position:absolute;left:50%;top:50%;width:360px;height:360px;transform:translate(-50%,-50%);pointer-events:none;z-index:20}
-#emoteWheel .slot{position:absolute;width:92px;height:92px;margin:-46px 0 0 -46px;background:rgba(14,21,48,.9);border:2px solid var(--line);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:12px;font-weight:900;text-transform:uppercase;text-align:center;color:#cfd6ee}
-#emoteWheel .slot.sel{background:var(--yellow);color:#111;border-color:#fff}
-#emoteWheel .slot small{font-size:9px;opacity:.6;font-weight:700}
-#emoteWheel .center{position:absolute;left:50%;top:50%;width:70px;height:70px;margin:-35px 0 0 -35px;background:rgba(14,21,48,.9);border:2px solid var(--line);border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:900}
 
 /* ---------- touch controls ---------- */
 #touchUi{position:absolute;inset:0;pointer-events:none}
@@ -301,7 +295,7 @@ body.touch #chat{width:min(290px,50vw)}
 #btOdds .odd{--rc:#999;border:2px solid var(--rc);padding:6px 12px;display:flex;flex-direction:column;align-items:center;min-width:74px}
 #btOdds .odd b{font-size:22px;font-style:italic;color:var(--rc)}#btOdds .odd span{font-weight:900}#btOdds .odd small{font-size:10px;opacity:.7;font-weight:700}
 /* stats */
-.stat{display:grid;grid-template-columns:90px 1fr 120px 116px;gap:4px 12px;align-items:center;background:rgba(255,255,255,.06);padding:10px 12px;margin-bottom:8px;border-left:4px solid var(--yellow)}
+.stat{display:grid;grid-template-columns:90px 1fr 110px auto;gap:4px 12px;align-items:center;background:rgba(255,255,255,.06);padding:10px 12px;margin-bottom:8px;border-left:4px solid var(--yellow)}
 .stat.maxed{border-left-color:#b25cff;background:rgba(178,92,255,.12)}
 .stat .sn{font-size:17px;font-weight:900;font-style:italic;text-transform:uppercase}
 .stat .sbar{position:relative;height:14px;background:rgba(0,0,0,.4)}
@@ -309,7 +303,7 @@ body.touch #chat{width:min(290px,50vw)}
 .stat .sbar em{position:absolute;top:0;bottom:0;background:#b25cff}
 .stat .sbar s{position:absolute;top:-3px;bottom:-3px;width:2px;background:rgba(255,255,255,.7)}
 .stat .sv{font-size:14px;font-weight:900}.stat .sv .bonus{color:#d9a8ff}.stat .sv small{display:block;font-size:10px;opacity:.65}
-.stat .sb{display:flex;gap:6px}.stat .sb button{padding:6px 8px;font-size:11px;background:var(--green);color:#06301a}
+.stat .sb{display:flex;gap:6px}.stat .sb button{padding:6px 8px;font-size:11px;background:var(--green);color:#06301a}.stat .sb button.minus{background:var(--red,#e5484d);color:#fff}
 .stat .sd{grid-column:1/-1;font-size:11px;font-weight:700;opacity:.8}
 .stat .pu{color:#d9a8ff;font-weight:900}.dim{opacity:.55}
 .chip{--rc:#999;display:inline-block;border:2px solid var(--rc);padding:3px 8px;margin:0 6px 6px 0;font-size:12px;font-weight:800}.chip b{color:var(--rc);font-style:italic}
@@ -329,7 +323,6 @@ body.touch #chat{width:min(290px,50vw)}
     <div class="tbtn" data-act="q">BUMP</div>
     <div class="tbtn" data-act="e">JUMP SET</div>
     <div class="tbtn" data-act="dive">DIVE</div>
-    <div class="tbtn" data-act="emote">EMOTE</div>
     <div class="tbtn" data-act="menu">MENU</div>
     <div class="tbtn" data-act="ball">BALL</div>
     <div class="tbtn" data-act="serve">SERVE</div>
@@ -346,7 +339,6 @@ body.touch #chat{width:min(290px,50vw)}
     <div id="chatLog"></div>
     <input id="chatInput" maxlength="120" placeholder="Press / to chat..." autocomplete="off">
   </div>
-  <div id="emoteWheel" class="hidden"><div class="center">EMOTES</div></div>
   <div id="inviteBox" class="hidden"><span id="inviteText"></span><button class="btn green small" id="inviteAccept">ACCEPT</button><button class="btn red small" id="inviteDecline">DECLINE</button></div>
   <div id="actions"></div>
 
@@ -414,7 +406,7 @@ body.touch #chat{width:min(290px,50vw)}
 
       <div class="mSec hidden" id="sec-inventory">
         <h2>Inventory</h2>
-        <div class="subtabs" id="invNav"><button class="on" data-inv="skins">Balls</button><button data-inv="fx">Score FX</button><button data-inv="emotes">Emotes</button><button data-inv="bt">Breakthroughs</button></div>
+        <div class="subtabs" id="invNav"><button class="on" data-inv="skins">Balls</button><button data-inv="fx">Score FX</button><button data-inv="bt">Breakthroughs</button></div>
         <div id="invBody">
           <div id="invMain"><div id="invGrid"></div><div id="invDetail"></div></div>
           <div id="invTraits" class="hidden">
@@ -427,7 +419,7 @@ body.touch #chat{width:min(290px,50vw)}
 
       <div class="mSec hidden" id="sec-shop">
         <h2>Shop</h2>
-        <div class="subtabs" id="shopTabs"><button class="on" data-tab="skins">Balls</button><button data-tab="fx">Score FX</button><button data-tab="emotes">Emotes</button><button data-tab="bt">Breakthroughs</button></div>
+        <div class="subtabs" id="shopTabs"><button class="on" data-tab="skins">Balls</button><button data-tab="fx">Score FX</button><button data-tab="bt">Breakthroughs</button></div>
         <div id="shopNote" style="font-size:12px;font-weight:700;opacity:.75;margin-bottom:10px"></div>
         <div class="grid" id="shopGrid"></div>
         <div id="btOdds" class="hidden"></div>

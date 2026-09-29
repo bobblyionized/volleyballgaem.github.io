@@ -118,8 +118,9 @@ const POSES = {
   sit:         P2(-6, 4, 28, 58, 28, 58, 76, -76, 76, -76),
   lie:         P2(0, 6, 150, 20, 150, 20, 4, -10, 4, -10),
   toss:        P2(-4, -16, 160, 0, 15, 6, 0, 0, 0, 0),
+  approach:    P2(34, -22, -62, 12, -70, 16, 64, -92, 24, -48),          // the last step of the run-up: low, both arms thrown back
 };
-const POSE_SNAP = { jumpUp: 22, land: 20, spikeCharge: 26, spikeHit: 32, bump: 20 };
+const POSE_SNAP = { approach: 26, jumpUp: 22, land: 20, spikeCharge: 26, spikeHit: 32, bump: 20 };
 const JERSEY2 = { black: { shirt: '#1d1e25', trim: '#e5484d', shorts: '#15161b', num: '#ffffff', pad: '#d9383f', sock: '#1d1e25' }, white: { shirt: '#eef0f4', trim: '#2b5fd9', shorts: '#e3e6ec', num: '#2b2d35', pad: '#2b2d35', sock: '#f7f7f7' } };
 const HAIRS = [['#f1d27a', '#2a5fe0'], ['#e8843a', '#b85a1c'], ['#3a2a22', '#241812'], ['#dfe3ea', '#9aa3b2'], ['#1c1c24', '#35354a'], ['#c9924a', '#8a5a2a'], ['#f1d27a', '#d9a93a']];
 function lookFor(variant, model, hairIdx = 0) {
