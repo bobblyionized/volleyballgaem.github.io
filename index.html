@@ -1702,9 +1702,11 @@ const hasAbility = id => btEquipped().some(b => b.r === 'X' && b.ab === id);
 function purpleMask() { let m = 0; for (const k of STAT_KEYS) if (stat(k) >= 100) m |= PU[k]; return m; }
 const myPurple = k => (purpleMask() & PU[k]) !== 0;
 /* the curves */
-const jumpMult = L => L <= 50 ? 0.8 + 0.2 * L / 50 : 1 + (L - 50) / 50;             // jump height: 0.8x at 0, today at 50, 2x at 100
+const jumpMult = L => (L <= 50 ? 0.8 + 0.2 * L / 50 : 1 + (L - 50) / 50) * lerp(1.25, 0.75, clamp(L / 100, 0, 1));   // jump height: 1x at 0 and 50, 1.5x at 100 (25% up at the bottom, 25% down at the top)
 const jumpV = L => Math.sqrt(2 * G * JUMP_H50 * jumpMult(L));
-const spikeMult = L => L <= 50 ? 0.82 + 0.18 * L / 50 : 1 + 0.4 * (L - 50) / 50;     // spike speed
+const spikeBase = L => L <= 50 ? 0.82 + 0.18 * L / 50 : 1 + 0.4 * (L - 50) / 50;
+/* spike speed: 25% harder up to 50, 50% harder from 50 to 100 (blended over 50-60), and past 100 it grows exponentially */
+const spikeMult = L => L <= 100 ? spikeBase(L) * lerp(1.25, 1.5, clamp((L - 50) / 10, 0, 1)) : spikeBase(100) * 1.5 * Math.pow(1.01, L - 100);
 const spikeReach = L => clamp(L - 50, -50, 100) / 50 * 0.3 * PS;                     // where you meet the ball, up or down
 const speedMult = L => 0.8 + L / 175;                                                // 35 = today's run
 const diveDist = L => L <= 50 ? 7.5 * (0.7 + 0.3 * L / 50) : 7.5 + (22 - 7.5) * Math.min(1, (L - 50) / 50);
@@ -1987,14 +1989,29 @@ function spikeSolve(x, y, fwd, tz, c, mult = 1) {  // the spike (shared by playe
     const gFar = lerp(0.18, 2.6, far); const gg = BALL_G * gFar;
     const CL2 = courtL(); const R = ts >= 0 ? lerp(toNet + CL2 / 4, toNet + 1.5, ts) : lerp(toNet + CL2 / 4, toNet + CL2 / 2 + 3, Math.min(1.25, -ts / 0.8 * Math.min(1, c)));
     let pf = ballisticPitch(sp, gg, R, -y); if (pf === null) pf = 40 * D;
-    for (let i = 0; i < 6; i++) { const t = toNet / (sp * Math.cos(pf)); const yy = y + sp * Math.sin(pf) * t - 0.5 * gg * t * t; if (yy >= NET_H + 0.4) break; pf += 4 * D; }
-    pitch = lerp(pitch, pf, Math.min(1, far / 0.3)); g = gFar;
+    let gUse = gFar; const tN0 = toNet / (sp * Math.cos(pf)); const yN0 = y + sp * Math.sin(pf) * tN0 - 0.5 * gg * tN0 * tN0;
+    if (yN0 < NET_H + 0.4 && R > toNet + 0.5) {        // too fast to drop in: more topspin - over the net at +0.6 and still down at R
+      const { p2, gNeed } = topspinSolve(y, toNet, R, sp);
+      if (gNeed > gFar) { pf = p2; gUse = gNeed; } else for (let i = 0; i < 6; i++) { const t = toNet / (sp * Math.cos(pf)); const yy = y + sp * Math.sin(pf) * t - 0.5 * gg * t * t; if (yy >= NET_H + 0.4) break; pf += 4 * D; }
+    }
+    pitch = lerp(pitch, pf, Math.min(1, far / 0.3)); g = gUse;
   }
   if (isFinite(toNet) && toNet < 40) {
     const tN = toNet / Math.max(0.5, sp * Math.cos(pitch)); const yN = y + sp * Math.sin(pitch) * tN - 0.5 * BALL_G * g * tN * tN;
     if (yN < NET_H + BALL_R) { const v = launchTo(x, y, x + fwd * (toNet + 4.5), 0, Math.max(y + 4.5, NET_H + 3.5)); return { vx: v.x, vy: v.y, g: 1, lob: true }; }
   }
   return { vx: fwd * Math.cos(pitch) * sp, vy: Math.sin(pitch) * sp, g, lob: false };
+}
+/* A ball too fast to drop in on its own gets topspin: the pitch and gravity that take it over the net at +0.6 and down at R. */
+function topspinSolve(y, toNet, R, sp) {
+  let R2 = R, k = 0, a = 0, lift = 0, p2 = 0, gNeed = 0; const h2 = -y;
+  for (let pass = 0; pass < 3; pass++) {          // the fixed physics step drops a heavy-topspin ball a little early: aim that much higher
+    const h1 = NET_H + 0.6 + lift - y;
+    for (let i = 0; i < 40; i++) { k = (h1 / toNet - h2 / R2) / (R2 - toNet); a = h1 / toNet + k * toNet; if (a <= Math.tan(6 * D)) break; R2 += 0.5; }   // never a loop: push the landing deeper instead
+    p2 = Math.atan(a); gNeed = k * 2 * sp * sp * Math.cos(p2) ** 2 / BALL_G;
+    lift = 0.5 * gNeed * BALL_G * BALL_STEP * toNet / (sp * Math.cos(p2));
+  }
+  return { p2, gNeed };
 }
 function serveSolve(bx, by, fwd, c, tz, mult) {  // a jump serve: your spike power, full gravity; the toss position picks short / long like a spike
   const ss = (13 + 22 * Math.min(1, c)) * mult; const cc = Math.min(1, c);
@@ -2004,9 +2021,10 @@ function serveSolve(bx, by, fwd, c, tz, mult) {  // a jump serve: your spike pow
   if (aimed) R = tz >= 0 ? lerp(R, toNet + 3, tz * 0.55) : R + -tz * 1.2 * 4.5;
   for (let k = 0; k < 12; k++) {
     const gg = BALL_G * gs; const p0 = ballisticPitch(ss, gg, R, -by); if (p0 === null) break; pitch = p0;
-    if (aimed) for (let i = 0; i < 8; i++) { const t = toNet / (ss * Math.cos(pitch)); const y = by + ss * Math.sin(pitch) * t - 0.5 * gg * t * t; if (y >= NET_H + 0.4) break; pitch += 3 * D; }
+    if (aimed) for (let i = 0; i < 8; i++) { const t = toNet / (ss * Math.cos(pitch)); const y = by + ss * Math.sin(pitch) * t - 0.5 * gg * t * t; if (y >= NET_H + 0.65) break; pitch += 3 * D; }
     const vy = ss * Math.sin(pitch), tf = (vy + Math.sqrt(vy * vy + 2 * gg * by)) / gg;
     if (!aimed || ss * Math.cos(pitch) * tf <= R + 0.6) break; gs += 0.15;
+    if (k === 11) { const r = topspinSolve(by, toNet, R, ss); if (r.gNeed > gs) { pitch = r.p2; gs = r.gNeed; } }   // a very hard serve: topspin brings it down
   }
   return { vx: fwd * Math.cos(pitch) * ss, vy: Math.sin(pitch) * ss, g: gs };
 }
@@ -2152,7 +2170,7 @@ function ballNets(b, px, py, h) {
       b.g = 1; b.pf = null; b.tapeT = T; continue;
     }
     if (b.y < NET_H && b.y > NET_H - NET_MESH) {
-      if (!b.netSide && Math.abs(dx) < BALL_R) b.netSide = Math.sign(dxp) || (b.vx > 0 ? -1 : 1);
+      if (!b.netSide && (Math.abs(dx) < BALL_R || (dx * dxp < 0 && py + (b.y - py) * dxp / (dxp - dx) < NET_H))) b.netSide = Math.sign(dxp) || (b.vx > 0 ? -1 : 1);
       const side = b.netSide;
       if (side) {
         const depth = BALL_R - side * dx;
