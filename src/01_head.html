@@ -8,13 +8,16 @@
 <style>
 :root{--bg:rgba(16,22,44,.92);--bg2:rgba(255,255,255,.07);--line:rgba(255,255,255,.16);--green:#3ecf7a;--red:#ff4d5e;--yellow:#ffd23f;--blue:#35a7ff;--orange:#ff8a1f;--navy:#0e1530;--navy2:#18224a;--text:#fff}
 *{box-sizing:border-box;user-select:none;-webkit-user-select:none}
-html,body{margin:0;height:100%;overflow:hidden;background:#9fd8f5;font-family:Montserrat,"Segoe UI",Arial,sans-serif;color:var(--text)}
+html,body{margin:0;height:100%;overflow:hidden;background:#9fd8f5;font-family:Montserrat,"Segoe UI",Arial,sans-serif;color:var(--text);cursor:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'><path d='M3 2 L3 22 L8.5 17 L12.5 26 L16 24.5 L12 15.8 L19.5 15.8 Z' fill='%23ff8a1f' stroke='white' stroke-width='2' stroke-linejoin='round'/></svg>") 3 2,auto}
+button,select,.tile,.mode,.tcard,.key,input[type=range]{cursor:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='28' height='28'><path d='M3 2 L3 22 L8.5 17 L12.5 26 L16 24.5 L12 15.8 L19.5 15.8 Z' fill='%23ff8a1f' stroke='white' stroke-width='2' stroke-linejoin='round'/></svg>") 3 2,pointer!important}
+body.inMatch canvas#c{cursor:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='36' height='36'><circle cx='18' cy='18' r='11' fill='none' stroke='%23101428' stroke-opacity='.55' stroke-width='5'/><circle cx='18' cy='18' r='11' fill='none' stroke='white' stroke-width='2.5'/><path d='M18 1v8M18 27v8M1 18h8M27 18h8' stroke='white' stroke-width='2.5' stroke-linecap='round'/><circle cx='18' cy='18' r='3' fill='%23ff8a1f' stroke='white' stroke-width='1'/></svg>") 18 18,crosshair}
+body.inMenu #chat{top:auto;bottom:14px;left:auto;right:14px;width:300px}
 canvas#c{position:fixed;inset:0;display:block;outline:none;touch-action:none}
 canvas#c.impact{filter:grayscale(1) brightness(1.08) contrast(8)}
 #ui{position:fixed;inset:0;pointer-events:none;overflow:hidden}
 #ui>*{pointer-events:auto}
 .hidden{display:none!important}
-button{font-family:inherit;font-weight:800;cursor:pointer;border:none;border-radius:8px;color:#fff;background:#2a3566;padding:9px 14px;font-size:14px}
+button{font-family:inherit;font-weight:800;border:none;border-radius:8px;color:#fff;background:#2a3566;padding:9px 14px;font-size:14px}
 button:hover{filter:brightness(1.12)}
 button:active{transform:translateY(1px)}
 button:disabled{opacity:.4;cursor:not-allowed;filter:none}
@@ -210,7 +213,6 @@ body.touch #chat{width:min(290px,50vw)}
 .r-common{color:#b3bac2}.r-rare{color:#35a7ff}.r-epic{color:#b06bff}.r-legendary{color:#ffd23f}.r-mythic{color:#ff4d5e}
 .b-common{border-color:#9aa0a6!important}.b-rare{border-color:#35a7ff!important}.b-epic{border-color:#b06bff!important}.b-legendary{border-color:#ffd23f!important}.b-mythic{border-color:#ff4d5e!important}
 #shopDealer{display:flex;align-items:center;gap:12px;background:linear-gradient(90deg,rgba(255,138,31,.25),rgba(255,138,31,0));border-radius:12px;padding:8px 12px;margin-bottom:10px}
-#shopDealer canvas{width:56px;height:56px;border-radius:10px;background:rgba(0,0,0,.25)}
 #shopDealer b{font-size:18px;font-weight:900;font-style:italic;display:block}
 #shopDealer span{font-size:12px;font-weight:700;opacity:.8}
 /* quests */
@@ -274,7 +276,6 @@ body.touch #chat{width:min(290px,50vw)}
     <div class="tbtn" data-act="q">BUMP</div>
     <div class="tbtn" data-act="e">JUMP SET</div>
     <div class="tbtn" data-act="dive">DIVE</div>
-    <div class="tbtn" data-act="dash">DASH</div>
     <div class="tbtn" data-act="emote">EMOTE</div>
     <div class="tbtn" data-act="menu">MENU</div>
     <div class="tbtn" data-act="ball">BALL</div>
@@ -292,7 +293,6 @@ body.touch #chat{width:min(290px,50vw)}
     <div id="chatLog"></div>
     <input id="chatInput" maxlength="120" placeholder="Press / to chat..." autocomplete="off">
   </div>
-  <div id="wind" class="hidden"><i>➤</i><span id="windTxt">WIND 0.0</span></div>
   <div id="emoteWheel" class="hidden"><div class="center">EMOTES</div></div>
   <div id="inviteBox" class="hidden"><span id="inviteText"></span><button class="btn green small" id="inviteAccept">ACCEPT</button><button class="btn red small" id="inviteDecline">DECLINE</button></div>
   <div id="actions"></div>
@@ -325,6 +325,7 @@ body.touch #chat{width:min(290px,50vw)}
 
       <div class="mSec" id="sec-play">
         <h2>Play <small id="playSub">Pick a mode. Your party is your team.</small></h2>
+        <div class="pane hidden" id="inMatchPane" style="display:flex;align-items:center;gap:12px"><b style="flex:1">You're in a match.</b><button class="btn red" id="menuLeave">LEAVE MATCH</button></div>
         <div id="modeCards">
           <button class="mode m2" data-mode="2v2"><span class="mc" id="mc2v2">BEACH</span><span class="mt">2v2</span><span class="md">Beach doubles</span></button>
           <button class="mode m3" data-mode="3v3"><span class="mc" id="mc3v3">INDOOR</span><span class="mt">3v3</span><span class="md">Indoor triples</span></button>
@@ -343,7 +344,7 @@ body.touch #chat{width:min(290px,50vw)}
 
       <div class="mSec hidden" id="sec-inventory">
         <h2>Inventory</h2>
-        <div class="subtabs" id="invNav"><button class="on" data-inv="skins">Balls</button><button data-inv="models">Characters</button><button data-inv="fx">Score FX</button><button data-inv="emotes">Emotes</button><button data-inv="traits">Traits</button></div>
+        <div class="subtabs" id="invNav"><button class="on" data-inv="skins">Balls</button><button data-inv="fx">Score FX</button><button data-inv="emotes">Emotes</button><button data-inv="traits">Traits</button></div>
         <div id="invBody">
           <div id="invMain"><div id="invGrid"></div><div id="invDetail"></div></div>
           <div id="invTraits" class="hidden">
@@ -356,8 +357,8 @@ body.touch #chat{width:min(290px,50vw)}
 
       <div class="mSec hidden" id="sec-shop">
         <h2>Shop</h2>
-        <div class="subtabs" id="shopTabs"><button class="on" data-tab="skins">Balls</button><button data-tab="models">Characters</button><button data-tab="fx">Score FX</button><button data-tab="emotes">Emotes</button><button data-tab="boxes">Trait Boxes</button></div>
-        <div id="shopDealer"><canvas id="dealerPic" width="112" height="112"></canvas><div><b id="shopTitle">Lil Man Dealer</b><span id="shopNote"></span></div></div>
+        <div class="subtabs" id="shopTabs"><button class="on" data-tab="skins">Balls</button><button data-tab="fx">Score FX</button><button data-tab="emotes">Emotes</button><button data-tab="boxes">Trait Boxes</button></div>
+        <div id="shopDealer"><span id="dealerPic" style="font-size:34px;width:56px;text-align:center"></span><div><b id="shopTitle">Lil Man Dealer</b><span id="shopNote"></span></div></div>
         <div class="grid" id="shopGrid"></div>
         <div id="traitPeek" class="pane hidden" style="margin-top:12px"><h3 id="traitPeekTitle">Hover a box to see what's inside</h3><div id="traitPeekCards"></div></div>
       </div>
@@ -416,7 +417,6 @@ body.touch #chat{width:min(290px,50vw)}
         </div>
         <div id="set-game" class="hidden" style="max-width:520px">
           <div class="pane"><h3>Graphics</h3><select id="gfxSel"><option value="high">High (all effects, crisp pixels)</option><option value="medium">Medium (all effects, 1x pixels)</option><option value="low">Low (fewer particles, lower resolution)</option><option value="ultra">Ultra low (no effects, still scenery, classic balls)</option></select></div>
-          <div class="pane"><h3>Lobby camera zoom <span id="zoomVal" style="color:#fff">100%</span></h3><input type="range" id="zoomSel" min="70" max="140" step="5" value="100" style="padding:0;border:0;background:transparent"></div>
           <div class="pane"><h3>Time of day</h3><select id="todSel"><option value="relative">Relative (real EST time)</option><option value="day">Day Time</option><option value="night">Night Time</option></select></div>
         </div>
       </div>

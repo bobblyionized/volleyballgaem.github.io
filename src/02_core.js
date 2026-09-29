@@ -89,7 +89,7 @@ let serverOffset = 0;
 db.ref('.info/serverTimeOffset').on('value', s => serverOffset = s.val() || 0);
 const snow = () => Date.now() + serverOffset;
 
-const S = { online: false, scene: 'lobby', padId: null, queue: null, match: null, booted: false };
+const S = { online: false, scene: 'menu', padId: null, queue: null, match: null, booted: false };
 const SID = 's' + rnd() + Date.now().toString(36);   // unique per tab
 const me = { sid: SID, id: SID, name: 'Guest', guest: true, dollars: 0, friends: {}, requests: {}, lower: null, skins: {}, skin: 'default', fxs: {}, fx: 'none', model: 'boy', models: {}, emotes: {}, wheel: {}, boxes: {}, traits: {}, loadout: {} };
 
@@ -97,31 +97,31 @@ const me = { sid: SID, id: SID, name: 'Guest', guest: true, dollars: 0, friends:
 /* Every control the game reads goes through KEYS. In 2D: A / D run, W / S aim (spike, block, bump strength,
    jump set) and climb onto / drop off the stairs. Escape always closes the menu on top of whatever it is bound to. */
 const KEY_DEFAULTS = {
-  moveF: 'KeyW', moveB: 'KeyS', moveL: 'KeyA', moveR: 'KeyD',
-  block: 'KeyQ', bump: 'KeyQ', dive: 'ControlLeft', jumpSet: 'KeyE', ability: 'KeyR',
-  groundSet: 'Mouse0', spike: 'Mouse0', toss: 'Mouse0', spawnBall: 'KeyG', serve: 'Digit1', jump: 'Space', interact: 'KeyE', emote: 'KeyB',
+  moveL: 'KeyA', moveR: 'KeyD',
+  block: 'KeyQ', bump: 'KeyQ', dive: 'ControlLeft', jumpSet: 'KeyE',
+  groundSet: 'Mouse0', spike: 'Mouse0', toss: 'Mouse0', spawnBall: 'KeyG', serve: 'Digit1', jump: 'Space', emote: 'KeyB',
   chat: 'Slash', menu: 'KeyM'
 };
 // mirrored to the right of the keyboard, for players who hold the mouse in their left hand
 const KEY_LEFTY = {
-  moveF: 'ArrowUp', moveB: 'ArrowDown', moveL: 'ArrowLeft', moveR: 'ArrowRight',
-  block: 'KeyP', bump: 'KeyP', dive: 'ControlRight', jumpSet: 'KeyO', ability: 'KeyU',
-  groundSet: 'Mouse0', spike: 'Mouse0', toss: 'Mouse0', spawnBall: 'KeyL', serve: 'Digit0', jump: 'Space', interact: 'KeyO', emote: 'Semicolon',
+  moveL: 'ArrowLeft', moveR: 'ArrowRight',
+  block: 'KeyP', bump: 'KeyP', dive: 'ControlRight', jumpSet: 'KeyO',
+  groundSet: 'Mouse0', spike: 'Mouse0', toss: 'Mouse0', spawnBall: 'KeyL', serve: 'Digit0', jump: 'Space', emote: 'Semicolon',
   chat: 'Slash', menu: 'KeyM'
 };
 const KEY_LABELS = {
-  moveF: 'Up (aim high / climb stairs)', moveB: 'Down (aim low / drop off stairs)', moveL: 'Run Left', moveR: 'Run Right',
-  block: 'Block', bump: 'Bump', dive: 'Dive', ability: 'Ability', jumpSet: 'Jump Set', groundSet: 'Ground Set',
-  spike: 'Spike', toss: 'Toss / Serve toss', spawnBall: 'Spawn Ball', serve: 'Serve', jump: 'Jump', interact: 'Interact', emote: 'Emote Wheel',
+  moveL: 'Run Left', moveR: 'Run Right',
+  block: 'Block', bump: 'Bump', dive: 'Dive', jumpSet: 'Jump Set', groundSet: 'Ground Set',
+  spike: 'Spike', toss: 'Toss / Serve toss', spawnBall: 'Spawn Ball (practice)', serve: 'Serve (practice)', jump: 'Jump', emote: 'Emote Wheel',
   chat: 'Chat', menu: 'Menu'
 };
 const KEY_GROUPS = [
-  ['Movement', ['moveL', 'moveR', 'moveF', 'moveB', 'jump', 'dive', 'ability']],
+  ['Movement', ['moveL', 'moveR', 'jump', 'dive']],
   ['Ball', ['bump', 'groundSet', 'jumpSet', 'block', 'spike', 'toss', 'serve', 'spawnBall']],
-  ['Interface', ['menu', 'emote', 'interact', 'chat']]
+  ['Interface', ['menu', 'emote', 'chat']]
 ];
 let KEYS = Object.assign({}, KEY_DEFAULTS);
-try { const s = JSON.parse(localStorage.getItem('vg_keys2d') || 'null'); if (s) KEYS = Object.assign({}, KEY_DEFAULTS, s); } catch (e) { }
+try { const s = JSON.parse(localStorage.getItem('vg_keys2d') || 'null'); if (s) { for (const k in s) if (!(k in KEY_DEFAULTS)) delete s[k]; KEYS = Object.assign({}, KEY_DEFAULTS, s); } } catch (e) { }
 const BOUND = new Set();                     // every code currently in use, so the browser's own shortcut can be suppressed
 function keyName(code) {
   if (!code) return '-';
@@ -176,17 +176,18 @@ $('#kbLefty').onclick = () => usePreset(KEY_LEFTY, 'Left-handed layout');
 applyKeys();
 
 /* ---------------- The menu ----------------
-   One menu, opened with M: PLAY (queue), INVENTORY, SHOP, QUESTS, FRIENDS & PARTY, SETTINGS.
-   It covers the left of the screen; the lobby keeps running on the right and you can still walk and jump. */
+   The main menu is the home screen: PLAY (queue), INVENTORY, SHOP, QUESTS, FRIENDS & PARTY, SETTINGS.
+   In a match, M opens it over the court (and closes it again). */
 let menuSec = 'play';
 const SECTIONS = ['play', 'inventory', 'shop', 'quests', 'social', 'settings'];
 function menuOpen() { return !$('#menu').classList.contains('hidden'); }
+const inAMatch = () => S.scene === 'match' && !!S.match;
 function openMenu(sec) {
   if (sec) menuSec = sec;
-  $('#menu').classList.remove('hidden'); $('#menuChip').classList.add('hidden');
+  $('#menu').classList.remove('hidden'); $('#menuChip').classList.add('hidden'); $('#menuClose').classList.toggle('hidden', !inAMatch());
   showSection(menuSec);
 }
-function closeMenu() { $('#menu').classList.add('hidden'); $('#menuChip').classList.remove('hidden'); rebinding = null; if (typeof onMenuClosed === 'function') onMenuClosed(); }
+function closeMenu() { if (!inAMatch()) return; $('#menu').classList.add('hidden'); $('#menuChip').classList.remove('hidden'); rebinding = null; if (typeof onMenuClosed === 'function') onMenuClosed(); }
 function showSection(sec) {
   menuSec = sec;
   $$('.mNav button').forEach(b => b.classList.toggle('on', b.dataset.sec === sec));

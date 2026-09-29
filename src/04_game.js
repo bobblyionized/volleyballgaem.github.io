@@ -2,25 +2,25 @@
    GAMEPLAY: input, player, balls, networking, menu, match, bots, loop
    ===================================================================== */
 const G = 14;
-const MOVE_SPEED = 6.5, JUMP_V = 9.03, GROUND_CD = 0.7, DIVE_CD = 0.3, GLIDE_SPEED = 4.5;
+const MOVE_SPEED = 6.5, JUMP_V = 9.03, GROUND_CD = 0.7, DIVE_CD = 0.3;
 const REACH_G = 1.9, REACH_A = 1.8;
-const BODY_H = 1.8, HALF_W = 0.28, STEP = 0.62;
+const BODY_H = 1.9, HALF_W = 0.28;
 const TEAM_VARIANT = { A: 'black', B: 'white', L: 'white' };
-const LOBBY_SPAWN = { x: -13, y: 0 };
+const SET_TOP = () => NET_H * 2.5;                 // no set climbs higher than 2.5 nets
 
 /* ---------------- Player ---------------- */
 const P = {
-  x: LOBBY_SPAWN.x, y: LOBBY_SPAWN.y, vx: 0, vy: 0, f: 1, onGround: true, onStairs: false,
-  tilt: { x: 0, y: 0 }, tiltIn: { x: 0, y: 0 }, airUsed: false, cd: 0, moveDir: 1, moving: false, charging: false, chargeStart: 0, charge: 0,
-  holding: false, serveMode: false, serveAim: null, act: null, dive: null, emote: null, blockUntil: 0, blockHit: false, team: 'A', rig: null, jumpF: 1
+  x: -4, y: 0, vx: 0, vy: 0, f: 1, onGround: true,
+  airUsed: false, cd: 0, moveDir: 1, moving: false, charging: false, chargeStart: 0, charge: 0,
+  holding: false, serveMode: false, serveAim: null, act: null, dive: null, emote: null, blockUntil: 0, blockHit: false, blockLean: 0, team: 'A', rig: null, jumpF: 1
 };
 let T = 0;
 const faceNet = () => S.match && !S.match.practice;                       // in a real match you always face the net
 const teamSide = team => team === 'A' ? -1 : 1;                          // which side of the net a team plays on (x < 0 = A)
+const towardNet = () => faceNet() ? (P.team === 'A' ? 1 : -1) : (P.x < 0 ? 1 : -1);   // the direction of the net from where you stand
 
 /* ---------------- Balls ----------------
-   balls: id -> ball. Match ball id = 'match'; beach balls are keyed by the spawner's sid and anyone can hit them.
-   B = the ball the local player is currently engaged with (holding / last reached). */
+   balls: id -> ball. The only ball is the match ball ('match'). B = the ball the local player is engaged with. */
 const balls = new Map();
 let B = null;
 function makeBall(id, sceneName, skin = 'default') {
@@ -29,7 +29,7 @@ function makeBall(id, sceneName, skin = 'default') {
 }
 function removeBall(id) { const b = balls.get(id); if (!b) return; balls.delete(id); if (B === b) B = null; }
 function acrossNet(ax, bx) { for (const n of netsFor()) if ((ax - n.x) * (bx - n.x) < 0) return true; return false; }
-function ballReach(cx, cy, r, vScale = 1, allowAcross = false) {   // nearest reachable ball in this scene becomes B (vScale squashes the reach vertically)
+function ballReach(cx, cy, r, vScale = 1, allowAcross = false) {   // nearest reachable ball becomes B (vScale squashes the reach vertically)
   let best = null, bd = r;
   for (const b of balls.values()) {
     if (b.scene !== S.scene || !b.active || b.held || b.frozen) continue;
@@ -44,50 +44,40 @@ function ballReach(cx, cy, r, vScale = 1, allowAcross = false) {   // nearest re
 
 /* ---------------- Input ---------------- */
 const keys = new Set();
+const MOUSE = { x: innerWidth * 0.6, y: innerHeight * 0.3 };       // the cursor, in screen pixels: sets go to it, blocks lean toward it
+const worldMouse = () => ({ x: (MOUSE.x - VW / 2 - shakeX) / CAM.s + CAM.x, y: (VH / 2 + shakeY - MOUSE.y) / CAM.s + CAM.y });
 const isTyping = () => ['INPUT', 'TEXTAREA', 'SELECT'].includes((document.activeElement || {}).tagName);
-const MOVE_CODES = () => [KEYS.moveL, KEYS.moveR, KEYS.moveF, KEYS.moveB, KEYS.jump];
+const inMatch = () => S.scene === 'match' && !!S.match;
+document.addEventListener('mousemove', e => { MOUSE.x = e.clientX; MOUSE.y = e.clientY; });
 document.addEventListener('keydown', e => {
   if (rebinding) { e.preventDefault(); setBind(e.code); return; }
   if (isTyping()) return;
-  if (e.code === 'Escape') { if (wheelOpen) return; if (uiOpen()) closePanels(); return; }
-  if (e.code === KEYS.menu) { e.preventDefault(); if (!$('#openFx').classList.contains('hidden')) return; menuOpen() ? closeMenu() : openMenu(); return; }
-  if (e.code === KEYS.chat && !menuOpen()) { e.preventDefault(); $('#chatInput').focus(); return; }
+  if (e.code === 'Escape') { if (wheelOpen) return; if (!$('#openFx').classList.contains('hidden') || !$('#confirmBox').classList.contains('hidden')) closePanels(); else if (inMatch() && menuOpen()) closeMenu(); return; }
+  if (e.code === KEYS.menu) { e.preventDefault(); if (!inMatch() || !$('#openFx').classList.contains('hidden')) return; menuOpen() ? closeMenu() : openMenu(); return; }
+  if (e.code === KEYS.chat) { e.preventDefault(); $('#chatInput').focus(); return; }
   if (BOUND.has(e.code) || e.code === 'Tab' || e.code.startsWith('Arrow') || e.code === 'Space') e.preventDefault();
-  if (e.repeat) return;
-  const blocked = !$('#openFx').classList.contains('hidden') || !$('#confirmBox').classList.contains('hidden');
-  if (blocked) return;
-  if (menuOpen() && !MOVE_CODES().includes(e.code)) return;             // the menu is up: you can still walk and jump around the lobby, nothing else
+  if (e.repeat || !inMatch() || uiOpen()) return;
   if (!keys.has(e.code)) { keys.add(e.code); onPress(e.code); }
 });
 document.addEventListener('keyup', e => { keys.delete(e.code); onRelease(e.code); });
 addEventListener('blur', () => { keys.clear(); });
 document.addEventListener('contextmenu', e => e.preventDefault());
 canvas.addEventListener('mousedown', e => {
-  const code = 'Mouse' + e.button;
+  const code = 'Mouse' + e.button; MOUSE.x = e.clientX; MOUSE.y = e.clientY;
   if (rebinding) { setBind(code); return; }
-  if (uiOpen()) return;
+  if (uiOpen() || !inMatch()) return;
   canvas.focus();
   if (!keys.has(code)) { keys.add(code); onPress(code); }
 });
 document.addEventListener('mouseup', e => { const code = 'Mouse' + e.button; if (keys.has(code)) { keys.delete(code); onRelease(code); } });
 document.addEventListener('mousedown', e => { if (rebinding && e.target !== canvas && !e.target.classList.contains('key')) { setBind('Mouse' + e.button); e.preventDefault(); } });
-
-function inputAxes() {                        // keyboard + joystick, each clamped to -1..1
-  const ix = clamp((keys.has(KEYS.moveR) ? 1 : 0) - (keys.has(KEYS.moveL) ? 1 : 0) + TOUCH.x, -1, 1);
-  const iy = clamp((keys.has(KEYS.moveF) ? 1 : 0) - (keys.has(KEYS.moveB) ? 1 : 0) + TOUCH.y, -1, 1);
-  return { ix, iy };
-}
+function inputAxes() { return { ix: clamp((keys.has(KEYS.moveR) ? 1 : 0) - (keys.has(KEYS.moveL) ? 1 : 0) + TOUCH.x, -1, 1) }; }
 
 /* ---------------- Actions ---------------- */
 function onPress(code) {
   if (code === KEYS.emote) { toggleWheel(); return; }
-  if (P.emote && code !== KEYS.moveF && code !== KEYS.moveB) stopEmote();
-  if (code === KEYS.moveF) tryStairs(true);
-  if (code === KEYS.moveB) tryStairs(false);
-  if (code === KEYS.interact && P.onGround && nearNPC()) { talkNPC(nearNPC()); return; }
+  if (P.emote) stopEmote();
   if (code === KEYS.jump) tryJump();
-  if (menuOpen()) return;
-  if (code === KEYS.ability) { tryDash(); return; }
   if (code === KEYS.serve) trySpawnBall(true);
   else if (code === KEYS.spawnBall) trySpawnBall(false);
   if (P.holding) { if (code === KEYS.toss) doToss(); return; }
@@ -99,21 +89,15 @@ function onPress(code) {
     else if (code === KEYS.dive) doDive();
   } else {
     if (P.airUsed) return;
-    if (P.doubleSpike) { if (code === KEYS.spike) startSpike(); return; }   // Double Spike: the second action is a spike, nothing else
     if (code === KEYS.block) doBlock();
     else if (code === KEYS.jumpSet) doJumpSet();
     else if (code === KEYS.spike) startSpike();
   }
 }
 function onRelease(code) { if (P.charging && code === KEYS.spike) releaseSpike(); }
-function tryStairs(up) {                       // Up at the foot of the stairs steps onto them; Down drops off them
-  if (S.scene !== 'lobby') return;
-  if (up && !P.onStairs && P.onGround && P.y < 0.3 && P.x >= STAIRS.x2 - 1.0 && P.x <= STAIRS.x2 + 1.4) P.onStairs = true;
-  else if (!up && P.onStairs && P.x > STAIRS.x1 + 0.4) { P.onStairs = false; P.onGround = false; P.vy = Math.min(P.vy, 0); }
-}
 function tryJump() {
   if (!P.onGround || P.dive || T < (P.landLock || 0)) return;
-  P.vy = JUMP_V * (hasTrait('b3p2') ? Math.sqrt(1.32) : 1); P.onGround = false; P.airUsed = false; P.doubleSpike = false; P.dsUsed = false; P.glide = null; P.tilt.x = P.tilt.y = 0; P.tiltIn.x = P.tiltIn.y = 0;   // Power Jump: 20% more height under 10% more gravity
+  P.vy = JUMP_V * (hasTrait('b3p2') ? Math.sqrt(1.32) : 1); P.onGround = false; P.airUsed = false;   // Power Jump: 20% more height under 10% more gravity
   jumpFx(P.x, P.y, groundDustColor());
   P.jumpF = P.f; P.rig.base = P.holding ? 'hold' : 'air';
   P.rig.impact(0.16); camKick(0.04, 1.6);
@@ -127,91 +111,82 @@ function launchTo(fx, fy, tx, ty, apexY, g = BALL_G) {          // velocity that
   return { x: (tx - fx) / (tUp + tDown), y: vy };
 }
 const netDir = () => faceNet() ? (P.team === 'A' ? 1 : -1) : P.f;
-const groundTilt = () => { const { ix, iy } = inputAxes(); return clamp(ix * P.f + iy, -1, 1); };   // toward the way you face (or Up) = more, away (or Down) = less
+const ceilY = () => S.match ? courtDims().ceil : 40;
 
-const ACT_WINDOW = 0.3, BUMP_POWER = 1.25;         // bumps launch 25% harder than the aimed arc; touches stay armed a moment so a late ball still counts
-function doBump() { P.rig.setPose('bump', T + 0.45); P.cd = GROUND_CD; P.act = { type: 'bump', until: T + ACT_WINDOW }; setTimeout(() => actionFx('bump', P.x, P.y, P.f), 60); tryAct(); }
+const ACT_WINDOW = 0.3;                            // touches stay armed a moment so a late ball still counts
+const BUMP_G = 0.75, BUMP_DIST = 9;                // bumps: floaty and high, always out toward the net
+function doBump() { P.f = towardNet(); P.rig.setPose('bump', T + 0.5); P.cd = GROUND_CD; P.act = { type: 'bump', until: T + ACT_WINDOW }; setTimeout(() => actionFx('bump', P.x, P.y, P.f), 60); tryAct(); }
 function doGroundSet() { P.rig.setPose('set', T + 0.45); P.cd = GROUND_CD; P.act = { type: 'set', until: T + ACT_WINDOW }; setTimeout(() => actionFx('set', P.x, P.y, P.f), 80); tryAct(); }
 function doJumpSet() { P.airUsed = true; P.airActed = true; P.rig.base = 'airDown'; P.rig.setPose('set', T + 0.45); P.act = { type: 'jset', until: T + ACT_WINDOW }; setTimeout(() => actionFx('set', P.x, P.y, P.f), 80); tryAct(); }
 function tryAct() {
   const a = P.act; if (!a) return;
-  if (T > a.until) {
-    P.act = null;
-    if ((a.type === 'spike' || a.type === 'tip') && !P.onGround && !P.doubleSpike && !P.dsUsed && hasTrait('b2a')) {   // Double Spike: a whiffed swing arms one more, full-power lightning spike this jump
-      P.doubleSpike = true; P.dsUsed = true; P.airUsed = false; P.rig.base = 'air'; P.rig.setPose('air');
-    }
-    return;
-  }
+  if (T > a.until) { P.act = null; return; }
   if (a.type === 'bump') {
     if (!ballReach(chestX(), chestY(), REACH_G)) return; P.act = null;
-    const gt = groundTilt(); const dist = 7.5 + 5.0 * gt;
-    const v = launchTo(B.x, B.y, P.x + P.f * dist, 0, Math.max(5.8 - Math.max(0, gt) * 1.0, B.y + 2));
-    hitBall('bump', v.x * BUMP_POWER, v.y * BUMP_POWER, 1);
+    const v = launchTo(B.x, B.y, P.x + P.f * BUMP_DIST, 0, Math.min(ceilY() - 0.8, Math.max(7.5, B.y + 3.5)), BALL_G * BUMP_G);
+    hitBall('bump', v.x, v.y, BUMP_G);
   } else if (a.type === 'set') {
-    if (!ballReach(chestX(), chestY() + 0.5, REACH_G + 0.2)) return; P.act = null;
-    const dir = P.moving ? P.moveDir : P.f * 0.12;
-    if (hasTrait('b2p2')) { const g4 = 0.55; const v = launchTo(B.x, B.y, P.x + dir * (P.moving ? 6.5 : 1.2), 0, Math.max(7.0, B.y + 3.5), BALL_G * g4); finishSet(v.x, v.y, g4); }   // 4th Tempo: floaty, higher, carries further the way you run
-    else { const v = launchTo(B.x, B.y, P.x + dir * 3.7, 0, Math.max(5.3, B.y + 2.2)); finishSet(v.x, v.y, 1); }
+    if (!ballReach(chestX(), chestY() + 0.5, REACH_G + 0.2)) return; P.act = null; setToCursor(true);
   } else if (a.type === 'spike' || a.type === 'tip') {
     if (P.onGround) { P.act = null; return; }
     if (a.type === 'spike' ? doSpike(a.c) : doTip()) P.act = null;
   } else if (a.type === 'jset') {
     if (P.onGround) { P.act = null; return; }
-    if (!ballReach(highX(), highY(), REACH_A + 0.2)) return; P.act = null;
-    const w = clamp(P.tilt.x + P.tilt.y * P.f, -1, 1); const mag = Math.abs(w);
-    const dir = mag > 0.05 ? Math.sign(w) : P.f * 0.1;
-    const v = launchTo(B.x, B.y, P.x + dir * (0.5 + mag * 9.5), 0, Math.max(4.4, B.y + 1.4)); finishSet(v.x, v.y, 1);
+    if (!ballReach(highX(), highY(), REACH_A + 0.2)) return; P.act = null; setToCursor(false);
   }
 }
-const ANTENNA_TOP = () => NET_H + 0.8;          // antennas reach 80 cm over the tape
-function nearestNet(x) { let best = null; for (const n of netsFor()) { const d = Math.abs(x - n.x); if (d < 30 && (!best || d < best.dist)) best = { n, dist: d, side: Math.sign(x - n.x) || 1 }; } return best; }
-function finishSet(vx, vy, g) {                   // every set (ground, jump, 4th Tempo) ends here so the setter traits apply to all of them
-  if (hasTrait('b4a')) {
-    const info = nearestNet(B.x);
-    if (info && info.dist > 0.6 && Math.abs(vx) > 0.1 && Math.sign(vx) === -info.side) {    // aimed at the nearest net: Perfect Set
-      const s0 = Math.abs(vx) * 3; const tNet = info.dist / s0 * 1.394;                           // 3x faster, holding its pace, then decaying hard to 33% right at the net
-      const apex = Math.max(ANTENNA_TOP() + 0.3, B.y + 0.5); const gg = 2 * (apex - B.y) / (tNet * tNet);
-      hitBall('set', -info.side * s0, gg * tNet, gg / BALL_G);
-      B.pf = { cx: info.n.x, side: info.side, d0: info.dist, s0 }; writeBall(B); return;
-    }
-  }
-  if (hasTrait('b2p2') && g !== 1) { hitBall('set', vx, vy, g); return; }   // 4th Tempo keeps its own float
-  if (hasTrait('b4p1')) { vy *= 1.2; vx *= 2; }                              // Speed Set: 2x the horizontal speed, 1.2x the height
-  hitBall('set', vx, vy, g);
+/* Sets go to the cursor: the ball peaks where you point. Point level with yourself and it goes out fast and flat;
+   point high and it floats. Never higher than 2.5 nets; no limit sideways. */
+function setAim(bx, by, mx, my, ground) {
+  const apex = clamp(my, by + 0.45, Math.min(SET_TOP(), ceilY() - 0.6));
+  const dx = mx - bx; const ang = Math.atan2(Math.max(0, my - by), Math.abs(dx) + 0.01) / (Math.PI / 2);   // 0 = level, 1 = straight up
+  let g = lerp(1.15, 0.72, clamp(ang, 0, 1));
+  if (ground && hasTrait('b2p2')) g *= 0.7;                                  // 4th Tempo: ground sets float even more
+  if (hasTrait('b4p1')) g *= 1.69;                                           // Speed Set: same spot, 1.3x the pace
+  const gg = BALL_G * g; const vy = Math.sqrt(2 * gg * (apex - by)); const tUp = vy / gg;
+  return { vx: dx / tUp, vy, g };
 }
+function setToCursor(ground) { const m = worldMouse(); const v = setAim(B.x, B.y, m.x, m.y, ground); hitBall('set', v.vx, v.vy, v.g); }
 function doBlock() { P.airUsed = true; P.airActed = true; P.rig.base = 'block'; P.rig.setPose('block'); P.blockUntil = T + 10; P.blockHit = false; setTimeout(() => actionFx('block', P.x, P.y, P.f), 90); }
-function blockSolve(b, px, nd, tz) {             // a block touch by someone at px facing the net along nd: W tilt (tz >= 0) = kill block, S tilt = soft one-touch back to our side
+function blockSolve(b, px, nd, tz) {             // a block touch by someone at px facing the net along nd: leaning in (tz > 0) = kill block, leaning back = soft one-touch to our side
   const s = Math.hypot(b.vx, b.vy);
   if (tz >= 0) {
-    if (s >= 13) { const sp = s * 0.5, ang = 52 * D; return { vx: nd * Math.cos(ang) * sp, vy: -Math.sin(ang) * sp, g: 0.35 }; }
+    if (s >= 13) { const sp = s * 0.5, ang = (38 + 22 * tz) * D; return { vx: nd * Math.cos(ang) * sp, vy: -Math.sin(ang) * sp, g: 0.35 }; }
     const v = launchTo(b.x, b.y, px + nd * 5.5, 0, b.y + 3.6); return { vx: v.x, vy: v.y, g: 1 };
   }
-  const f = clamp((s - 6) / 22, 0, 1); const v = launchTo(b.x, b.y, px - nd * (1.5 + 6.5 * f), 0, b.y + lerp(3.6, 1.1, f)); return { vx: v.x, vy: v.y, g: 1 };
+  const f = clamp((s - 6) / 22, 0, 1) * -tz; const v = launchTo(b.x, b.y, px - nd * (1.5 + 6.5 * f), 0, b.y + lerp(3.6, 1.1, f)); return { vx: v.x, vy: v.y, g: 1 };
+}
+const BLOCK_LEAN = 0.45;                            // how far the body can lean toward the cursor while blocking (rad)
+function updateBlockLean() {                      // in the block, your body tilts toward the cursor (within limits)
+  if (P.onGround || P.rig.base !== 'block') { P.blockLean = 0; return; }
+  const m = worldMouse(); const ang = Math.atan2(m.x - P.x, m.y - (P.y + 1.9)) * P.f;   // 0 = straight up, + = toward the way you face
+  P.blockLean = clamp(ang, -BLOCK_LEAN, BLOCK_LEAN); P.rig.pitchTarget = P.blockLean * 0.8;
 }
 function blockContact() {
   P.blockHit = true; camKick(-0.03, 2.6);
-  const tz = clamp(P.tilt.y + P.tilt.x * P.f, -1, 1) * (hasTrait('b1p2') ? -1 : 1);   // Fake Block: the two tilts swapped
+  const tz = clamp(P.blockLean / BLOCK_LEAN, -1, 1) * (hasTrait('b1p2') ? -1 : 1);   // Fake Block: leaning in blocks soft, leaning back kills
   const r = blockSolve(B, P.x, netDir(), tz);
   hitBall('block', r.vx, r.vy, r.g);
 }
 function chargeAt(dt) { return dt <= 0.1875 ? dt / 0.1875 * 0.5 : clamp(0.5 + (dt - 0.1875) / 0.375 * 0.5, 0, 1); }   // 0.19s to half, 0.56s to full
 function startSpike() {
-  P.airUsed = true; P.charging = true; P.chargeStart = T; P.charge = 0; const dc = P.dashCharge; P.dashCharge = false;
-  if (P.doubleSpike) { P.chargeStart = T - 1; P.charge = 1; }                             // Double Spike: the second swing is always a full charge
-  else if (dc) { P.chargeStart = T - 0.375; P.charge = 0.75; }                            // fresh off a dash: the bar begins at 75%
-  else if (hasTrait('b2p1')) { P.chargeStart = T - 0.09375; P.charge = 0.25; }            // Spike Startup: the bar begins at 25%
+  P.airUsed = true; P.charging = true; P.chargeStart = T; P.charge = 0;
+  if (hasTrait('b2p1')) { P.chargeStart = T - 0.09375; P.charge = 0.25; }            // Spike Startup: the bar begins at 25%
   P.rig.setPose('air');
 }
 function releaseSpike() {
   P.charging = false;
-  const c = P.charge;                                            // decide from the charge that is on screen
+  const c = P.charge;
   if (c <= 0.35) { P.rig.base = 'airDown'; P.rig.setPose('tip', T + 0.4); if (!doTip()) P.act = { type: 'tip', until: T + 0.16 }; }   // a tap up to 35% is a tip
   else { P.rig.setPose('spikeCharge', T + 0.07); P.swingAt = T + 0.07; if (!doSpike(c)) P.act = { type: 'spike', c, until: T + 0.16 }; }
 }
+/* Where you meet the ball inside its hitbox decides the shot: hand on the ball's net side = hit down steep
+   (the old W), hand on the far side = drive it deep and flat (the old S). */
+function hitboxTilt(b, handX, fwd) { const d = (handX - b.x) * fwd; return clamp(Math.sign(d) * Math.max(0, Math.abs(d) - 0.25) / 1.05, -1, 1); }   // the middle half-metre is a straight hit
 function netAhead(x, fwd) { let best = Infinity; for (const n of netsFor()) { const d = (n.x - x) * fwd; if (d > 0.3) best = Math.min(best, d); } return best; }
 // pitch (rad) that lands a shot of speed s under gravity gg at horizontal distance R with height change h (low trajectory); null if unreachable
 function ballisticPitch(s, gg, R, h) { const disc = s * s * s * s - gg * (gg * R * R + 2 * h * s * s); if (disc < 0) return null; return Math.atan((s * s - Math.sqrt(disc)) / (gg * R)); }
-const courtL = () => S.scene === 'match' ? courtDims().l : COURT_L;
+const courtL = () => S.match ? courtDims().l : COURT_L;
 function spikeGeomAt(x, y, fwd) {
   let toNet = netAhead(x, fwd); if (!isFinite(toNet)) toNet = 7;
   const CL = courtL(); const dMid = clamp(toNet + CL / 4, 3, 24);
@@ -220,15 +195,16 @@ function spikeGeomAt(x, y, fwd) {
   const far = clamp((toNet - 3) / (8 * CL / COURT_L), 0, 1);                // 0 at the net, 1 from the back line
   return { neutralPitch, clearPitch, toNet, far };
 }
-function spikeSolve(x, y, fwd, tz, c, mult = 1) {   // the spike itself (shared by players and bots): velocity + gravity for a swing at charge c with tilt tz - lob means it would have hit the net (TOO LOW)
+function spikeSolve(x, y, fwd, tz, c) {           // the spike itself (shared by players and bots): velocity + gravity at charge c and tilt tz - lob means it would have hit the net (TOO LOW)
   const { neutralPitch, clearPitch, toNet, far } = spikeGeomAt(x, y, fwd);
-  const sp = (13 + 22 * c) * (tz > 0 ? lerp(1, 0.75, tz) : 1) * mult;   // W tilt trades power for steepness
-  let pitch = tz >= 0 ? lerp(neutralPitch, -60 * D, tz) : lerp(neutralPitch, neutralPitch * 0.4, -tz);
-  if (tz < 0.35) pitch = Math.max(pitch, clearPitch);
+  const ts = tz < 0 ? tz * 0.6 : tz;                                   // the deep (far side) shot has a softer effect - and nothing keeps it in
+  const sp = (13 + 22 * c) * (ts > 0 ? lerp(1, 0.75, ts) : 1);
+  let pitch = ts >= 0 ? lerp(neutralPitch, -60 * D, ts) : lerp(neutralPitch, neutralPitch * 0.4, -ts);
+  if (ts < 0.35) pitch = Math.max(pitch, clearPitch);
   let g = 0.18;
-  if (far > 0) {                                                        // far from the net: aim higher with more gravity so every tilt still lands in
+  if (far > 0) {                                                        // far from the net: aim higher with more gravity
     const gFar = lerp(0.18, 2.6, far); const gg = BALL_G * gFar;
-    const CL2 = courtL(); const R = tz >= 0 ? lerp(toNet + CL2 / 4, toNet + 1.5, tz) : lerp(toNet + CL2 / 4, toNet + CL2 / 2 - 0.8, -tz);
+    const CL2 = courtL(); const R = ts >= 0 ? lerp(toNet + CL2 / 4, toNet + 1.5, ts) : lerp(toNet + CL2 / 4, toNet + CL2 / 2 + 2.5, -ts / 0.6 * c);   // a full-power deep drive can sail long
     let pf = ballisticPitch(sp, gg, R, -y); if (pf === null) pf = 40 * D;
     for (let i = 0; i < 6; i++) { const t = toNet / (sp * Math.cos(pf)); const yy = y + sp * Math.sin(pf) * t - 0.5 * gg * t * t; if (yy >= NET_H + 0.4) break; pf += 4 * D; }
     pitch = lerp(pitch, pf, Math.min(1, far / 0.3)); g = gFar;
@@ -241,14 +217,15 @@ function spikeSolve(x, y, fwd, tz, c, mult = 1) {   // the spike itself (shared 
 }
 function doSpike(c) {
   if (!ballReach(highX(), highY(), REACH_A, 0.6)) return false;          // spike hitbox: 60% as tall
-  camKick(0.04 + c * 0.05, 2.2 + c * 4.0);
-  const fwd = P.jumpF; const tz = clamp(P.tilt.y + P.tilt.x * fwd, -1, 1);
-  if (B.serve) {                                                         // serve: slightly up, full gravity, tilt ignored; serve speed IS your spike power (uncapped)
-    const ss = (13 + 22 * c) * (P.doubleSpike ? 1.2 : 1) * (hasTrait('b3p1') ? 1.1 : 1);   // King Serve +10%
+  camKick(0.05 + c * 0.06, 2.6 + c * 4.5);
+  const fwd = P.jumpF; const tz = hitboxTilt(B, highX(), fwd);
+  if (B.serve) {                                                         // serve: slightly up, full gravity; serve speed IS your spike power (uncapped)
+    const ss = (13 + 22 * c) * (hasTrait('b3p1') ? 1.1 : 1);                   // King Serve +10%
     let gs = lerp(1, 2.0, c), pitch = lerp(20, 5, c) * D;
     const toNet = netAhead(B.x, fwd); const CL = courtL(); const aimed = isFinite(toNet) && toNet < 40;
-    const R = aimed ? lerp(toNet + CL / 4 + 1, toNet + CL / 2 - 1.2, c) : 14 + 10 * c;
-    for (let k = 0; k < 12; k++) {                                       // lowest arc that reaches the spot and clears the net; if that carries it out, fall heavier and retry
+    let R = aimed ? lerp(toNet + CL / 4 + 1, toNet + CL / 2 - 1.2, c) : 14 + 10 * c;
+    if (aimed) R = tz >= 0 ? lerp(R, toNet + 3, tz * 0.55) : R + -tz * 0.6 * 4.5;   // net side of the toss = short and dropping, far side = long (can go out)
+    for (let k = 0; k < 12; k++) {
       const gg = BALL_G * gs; const p0 = ballisticPitch(ss, gg, R, -B.y); if (p0 === null) break; pitch = p0;
       if (aimed) for (let i = 0; i < 8; i++) { const t = toNet / (ss * Math.cos(pitch)); const y = B.y + ss * Math.sin(pitch) * t - 0.5 * gg * t * t; if (y >= NET_H + 0.4) break; pitch += 3 * D; }
       const vy = ss * Math.sin(pitch), tf = (vy + Math.sqrt(vy * vy + 2 * gg * B.y)) / gg;
@@ -257,46 +234,33 @@ function doSpike(c) {
     hitBall('spike', fwd * Math.cos(pitch) * ss, Math.sin(pitch) * ss, gs, c);
     return true;
   }
-  const r = spikeSolve(B.x, B.y, fwd, tz, c, P.doubleSpike ? 1.2 : 1);   // Double Spike hits 20% harder
+  const r = spikeSolve(B.x, B.y, fwd, tz, c);
   hitBall('spike', r.vx, r.vy, r.g, c); if (r.lob) showBallMsg('TOO LOW', B); return true;
 }
 function doTip() {
   if (!ballReach(highX(), highY(), REACH_A, 0.6)) return false;
   if (B.serve) return doSpike(0.3);                              // a tap on a serve toss = soft serve
-  const fwd = P.jumpF, tz = clamp(P.tilt.y + P.tilt.x * fwd, -1, 1);
+  const fwd = P.jumpF, tz = hitboxTilt(B, highX(), fwd);
   let sp = 7, pitch = 32 * D;
-  if (tz > 0) { sp = lerp(7, 5.0, tz); pitch = lerp(32, 62, tz) * D; } else if (tz < 0) { sp = lerp(7, 9.0, -tz); pitch = lerp(32, 22, -tz) * D; }
-  const vx = fwd * Math.cos(pitch) * sp, vy = Math.sin(pitch) * sp;
-  if (hasTrait('b1a')) {                                          // Lightning Drop: same landing spot, but the ball rockets 3 m up and slams down under heavy gravity
-    const tf = (vy + Math.sqrt(vy * vy + 2 * BALL_G * B.y)) / BALL_G; const gd = 3.2;
-    const v = launchTo(B.x, B.y, B.x + vx * tf, 0, B.y + 3, BALL_G * gd); hitBall('tip', v.x, v.y, gd); return true;
-  }
-  hitBall('tip', vx, vy, 1); return true;
-}
-function tryDash() {                          // Dash (ability trait): a burst the way you hold (or face), 4 s cooldown; in the air it kills vertical momentum and refreshes your air action
-  if (!hasTrait('b3a') || P.dash || P.dive || P.holding || P.emote) return;
-  if (T < (P.dashReady || 0)) return;
-  const { ix } = inputAxes(); const dir = ix ? Math.sign(ix) : P.f;
-  P.dash = { t0: T, dur: 0.15, dir }; P.dashReady = T + 4; P.vx = 0; P.vy = 0; P.glide = null; P.dashCharge = true;   // the next spike after a dash starts three-quarters charged
-  if (!P.onGround) { P.airUsed = false; P.airActed = false; P.act = null; P.swingAt = 0; P.blockUntil = 0; P.doubleSpike = false; P.dsUsed = false; P.jumpF = P.f; P.charging = false; }   // reset the jump: spike, dash, spike again
-  else { P.moveDir = dir; P.moving = true; P.cd = 0; P.landLock = 0; P.act = null; }   // and the ground: set, dash, set again
-  P.rig.setPose('dash', T + 0.15); lightningFx(P.x, P.y + 0.9, -dir, 0, '#fff1a0', '#ffe066', 6);
+  if (tz > 0) { sp = lerp(7, 5.0, tz); pitch = lerp(32, 62, tz) * D; } else if (tz < 0) { sp = lerp(7, 8.2, -tz); pitch = lerp(32, 26, -tz) * D; }
+  hitBall('tip', fwd * Math.cos(pitch) * sp, Math.sin(pitch) * sp, 1); return true;
 }
 function doDive() {
   const dir = P.moving ? P.moveDir : P.f;
   P.dive = { t0: T, dur: 0.55, dir, hit: false };
-  const fwd = dir === P.f; P.rig.setPose(fwd ? 'dive' : 'diveB'); P.rig.pitchTarget = fwd ? 1.25 : -0.95; P.diveAnim = P.rig.pitchTarget;
+  const fwd = dir === P.f; P.rig.setPose(fwd ? 'dive' : 'diveB'); P.rig.pitchTarget = fwd ? 1.3 : -0.95; P.diveAnim = P.rig.pitchTarget;
 }
-function diveContact() { P.dive.hit = true; const v = launchTo(B.x, B.y, P.x + P.f * 2.5, 0, Math.max(5.5, B.y + 3)); hitBall('dive', v.x, v.y, 1); }
-function canSpawnHere() { const M = S.match; if (!M) return S.scene === 'lobby' && !indoors(P.x); return M.practice; }
+function diveContact() {                          // a dig off the floor: pops twice as high as it used to and floats down
+  P.dive.hit = true; const g = 0.7;
+  const v = launchTo(B.x, B.y, P.x + P.f * 2.5, 0, Math.min(ceilY() - 0.9, Math.max(11, B.y + 6)), BALL_G * g); hitBall('dive', v.x, v.y, g);
+}
+function canSpawnHere() { return !!(S.match && S.match.practice); }
 function trySpawnBall(serveMode, force = false) {
   if ((!force && !canSpawnHere()) || P.holding) return;
-  const M = S.match; let b;
-  if (!M) b = balls.get(SID) || makeBall(SID, 'lobby'); else b = balls.get('match');
-  if (!b) return;
+  const b = balls.get('match'); if (!b) return;
   B = b; b.skin = me.skin || 'default';
   b.active = true; b.frozen = false; b.vx = b.vy = 0; b.hitter = null; b.hitType = null; b.prevHitter = null; b.touches = 0; b.sideTeam = P.team; b.serve = false; b.tossedBy = null; b.landed = false; b.seq++; b.t = snow(); b.pf = null; b.netSide = 0;
-  P.holding = true; P.serveMode = !!serveMode || !!(M && !M.practice); P.serveAim = null; b.held = SID; P.rig.base = 'hold'; P.rig.setPose('hold');
+  P.holding = true; P.serveMode = !!serveMode || !!(S.match && !S.match.practice); P.serveAim = null; b.held = SID; P.rig.base = 'hold'; P.rig.setPose('hold');
   const h = P.rig.handPos('L'); b.x = h.x; b.y = h.y + BALL_R * 0.6;
   writeBall(b);
 }
@@ -305,9 +269,9 @@ function doToss() {
   if (P.serveMode && P.serveAim === null) { P.serveAim = 0; return; }   // first press: show the aim arrows
   P.holding = false; P.rig.setPose('toss', T + 0.45); P.rig.base = P.onGround ? 'idle' : 'air';
   b.held = null; const h = P.rig.handPos('L'); b.x = h.x; b.y = h.y + BALL_R * 0.6; b.tossedBy = SID;
-  if (P.serveMode) {                                                    // second press: toss the way the arrows point (drifts up to ~3.5 m)
+  if (P.serveMode) {                                                    // second press: toss the way the arrows point (aim is relative to where you face)
     const a = P.serveAim || 0; const m = Math.min(1, Math.abs(a));
-    b.serve = true; hitBall('toss', m > 0.01 ? Math.sign(a) * (0.35 + 1.2 * m) : 0, 8.8, 0.7);
+    b.serve = true; hitBall('toss', m > 0.01 ? P.f * Math.sign(a) * (0.35 + 1.2 * m) : 0, 8.8, 0.7);
   } else { b.serve = false; hitBall('toss', P.f * 0.4, Math.sqrt(2 * BALL_G * Math.max(0.5, P.y + 1.7 + 5 - b.y)), 1); }
   P.serveMode = false; P.serveAim = null;
   const M = S.match; if (M && !M.practice && M.state === 'serve') mwrite('state', 'rally');
@@ -319,68 +283,20 @@ function hitBall(type, vx, vy, g, charge = 0) {
   if (type === 'toss' || type === 'block') { b.touches = 0; b.sideTeam = P.team; }
   else { if (b.sideTeam !== P.team) { b.sideTeam = P.team; b.touches = 1; } else b.touches++; }
   if (type !== 'toss') { b.serve = false; P.serving = false; }                                      // the serve is away: you may step into the court again
-  b.spin = (Math.random() - 0.5) * 8 - vx * 1.5; b.landed = false;
-  b.ds = type === 'spike' && !!P.doubleSpike;                                                         // lightning spike: everyone sees the bolts
-  if (b.ds) lightningFx(b.x, b.y, vx, vy);
-  else if (type === 'spike') sparkle(b.x, b.y, 12, '#ffffff', 1.2, 0.2, 0.3, 0.035, vx / 30, vy / 30);
-  if (type === 'spike' || type === 'tip') P.doubleSpike = false;
+  b.spin = (Math.random() - 0.5) * 8 - vx * 1.5; b.landed = false; b.ds = false;
+  if (type === 'spike') { spikeRing(b.x, b.y, vx, vy); sparkle(b.x, b.y, 14, '#ffffff', 1.3, 0.2, 0.3, 0.035, vx / 30, vy / 30); }
   writeBall(b); hostCheckHit();
 }
 
-/* ---------------- World collision (lobby floors, stairs, walls, ceilings; the match floor) ---------------- */
-function groundAt(x, y, tol, stairs = P.onStairs) {
-  if (S.scene === 'match') return 0;
-  let g = -Infinity;
-  for (const f of FLOORS) if (x >= f.x1 && x <= f.x2 && f.y <= y + tol && f.y > g) g = f.y;
-  if (stairs && x >= STAIRS.x1 - 0.05 && x <= STAIRS.x2 + 0.05) { const sy = stairsY(x); if (sy <= y + tol && sy > g) g = sy; }
-  return g;
-}
-function moveBody(o, dt) {                       // move a player-sized body through the lobby: walls, ceilings, floors (o: x, y, vx, vy, onGround, onStairs)
-  let nx = o.x + o.vx * dt;
-  if (S.scene === 'lobby') {
-    for (const w of WALLS) {
-      if (o.y + BODY_H <= w.y1 || o.y >= w.y2) continue;
-      if (o.x <= w.x - HALF_W + 1e-3 && nx > w.x - HALF_W) nx = w.x - HALF_W;
-      else if (o.x >= w.x + HALF_W - 1e-3 && nx < w.x + HALF_W) nx = w.x + HALF_W;
-    }
-    nx = clamp(nx, LOBBY.x0 + HALF_W, LOBBY.house.x1 - HALF_W);
-  }
-  o.x = nx;
-  const prevY = o.y; o.y += o.vy * dt;
-  if (S.scene === 'lobby' && o.vy > 0) {
-    for (const c of CEILS) if (o.x >= c.x1 && o.x <= c.x2 && prevY + BODY_H <= c.y + 0.02 && o.y + BODY_H > c.y) { o.y = c.y - BODY_H; o.vy = 0; }
-    for (const w of WALLS) if (Math.abs(o.x - w.x) < HALF_W && prevY + BODY_H <= w.y1 + 0.02 && o.y + BODY_H > w.y1) { o.y = w.y1 - BODY_H; o.vy = 0; }   // head against the underside of a wall (door header)
-  }
-  if (o.onStairs && S.scene === 'lobby') {       // on / off the stairs
-    if (o.onGround && (o.x < STAIRS.x1 - 0.25 || o.x > STAIRS.x2 + 1.5)) o.onStairs = false;
-  } else if (S.scene === 'lobby' && o.onGround && Math.abs(o.y - F2) < 0.05 && o.x > STAIRS.x1 - 0.2) o.onStairs = true;   // walking off the upstairs landing takes you down the stairs
-  let landed = false;
-  if (o.onGround && o.vy <= 0) {
-    const g = groundAt(o.x, o.y, STEP, o.onStairs);
-    if (g > -Infinity && o.y - g <= STEP) { o.y = g; o.vy = 0; } else o.onGround = false;   // walked off an edge
-  } else if (o.vy <= 0) {
-    const g = S.scene === 'match' ? 0 : groundAt(o.x, prevY, 0.03, o.onStairs);
-    if (o.y <= g) { o.y = g; landed = true; }
-  }
-  return landed;
-}
-
-/* ---------------- Player update ---------------- */
+/* ---------------- Player update (match floor only) ---------------- */
 function updatePlayer(dt) {
   const ui = !$('#openFx').classList.contains('hidden');
-  let { ix, iy } = ui || isTyping() ? { ix: 0, iy: 0 } : inputAxes();
+  const { ix } = ui || isTyping() ? { ix: 0 } : inputAxes();
   if (P.cd > 0) P.cd -= dt;
   const steering = !!(P.holding && P.serveAim !== null);
-  tryAct();
+  tryAct(); updateBlockLean();
   if (P.swingAt && T >= P.swingAt) { P.swingAt = 0; if (!P.onGround) { P.rig.base = 'airDown'; P.rig.setPose('spikeHit', T + 0.4); actionFx('spike', P.x, P.y, P.jumpF); } }
-  if (P.dash) {
-    const e = (T - P.dash.t0) / P.dash.dur;
-    if (e >= 1) {
-      P.dash = null; P.vx = 0;                                                           // the dash leaves you with no momentum...
-      if (P.onGround) { P.rig.base = 'idle'; P.rig.setPose('idle'); }
-      else { P.rig.base = 'air'; P.rig.setPose('air'); P.glide = ix ? Math.sign(ix) : 0; }   // ...then you glide the way you were holding (locked in until you land)
-    } else { P.vx = P.dash.dir * 55.4 * (1 - e * 0.55); if (!P.onGround) P.vy = 0; if (e > 0.1 && Math.random() < 0.7) sparkle(P.x, P.y + 0.8, 3, '#ffe066', 0.35, 0.3, 0.25, 0.04); }
-  } else if (P.dive) {
+  if (P.dive) {
     const e = (T - P.dive.t0) / P.dive.dur;
     if (e >= 1) { P.dive = null; P.cd = DIVE_CD; P.rig.pitchTarget = 0; P.diveAnim = 0; P.rig.setPose('idle'); P.rig.base = 'idle'; }
     else P.vx = P.dive.dir * 15 * (1 - e * 0.6);
@@ -390,36 +306,30 @@ function updatePlayer(dt) {
     if (mv) { const ms = MOVE_SPEED * (hasTrait('b1p1') ? 1.1 : 1); P.vx = mv * ms; P.moveDir = Math.sign(mv); P.moving = true; }   // Quick Feet: +10%
     else { P.vx = 0; P.moving = false; }
     if (faceNet()) P.f = P.team === 'A' ? 1 : -1; else if (P.moving) P.f = P.moveDir;
-  } else {
-    if (P.glide) P.vx = P.glide * GLIDE_SPEED;                                          // post-dash glide
-    P.tiltIn.x = ix; P.tiltIn.y = iy;
   }
-  if (steering) { const want = clamp(ix * P.f + iy, -1, 1); P.serveAim += (want - P.serveAim) * smoothT(8, dt); }
+  if (steering) { const want = clamp(ix * P.f, -1, 1); P.serveAim += (want - P.serveAim) * smoothT(8, dt); }
   for (const f of FX_LIST) {                                              // black holes slowly pull anyone inside the outer ring
     if (f.type !== 'blackhole' || f.t > f.dur * 0.8) continue;
     const dx = f.x - P.x, dist = Math.abs(dx); if (dist > f.pull || dist < f.core) continue;
     P.x += Math.sign(dx) * 4.8 * dt;
   }
   if (P.onGround && P.moving && !P.dive) { P.stepAcc = (P.stepAcc || 0) + dt; if (P.stepAcc > 0.16) { P.stepAcc = 0; puff(P.x - P.moveDir * 0.2, P.y, 2, 0.6, 0.6, groundDustColor()); } }
-  const tk = smoothT(12, dt); P.tilt.x += ((P.onGround ? 0 : P.tiltIn.x) - P.tilt.x) * tk; P.tilt.y += ((P.onGround ? 0 : P.tiltIn.y) - P.tilt.y) * tk;
-  const tsf = timeStopFactor(P.x, P.y); const sdt = dt * tsf;              // Time Stop: inside the clock you move, jump and fall at 12% speed
-  if (!P.dash) P.vy -= G * (hasTrait('b3p2') ? 1.1 : 1) * (P.vy < 0 && hasTrait('b4p2') ? 0.7 : 1) * sdt;   // Power Jump falls 10% harder, Setter Vision floats down
-  const prevX = P.x;
-  const landed = moveBody(P, sdt);
-  if (S.scene === 'match') {                                              // the court: your side of the net, and behind the line while serving
-    const cd = courtDims(); P.x = clamp(P.x, -cd.wall + 0.5, cd.wall - 0.5);
-    if (S.match && !S.match.practice) { P.x = P.team === 'A' ? Math.min(P.x, -0.45) : Math.max(P.x, 0.45); if (P.serving && P.onGround) { const back = cd.half + 0.35; P.x = P.team === 'A' ? Math.min(P.x, -back) : Math.max(P.x, back); } }   // foot fault: no stepping over the back line until the serve is hit
-  }
+  const sdt = dt * timeStopFactor(P.x, P.y);                              // Time Stop: inside the clock you move, jump and fall at 12% speed
+  P.vy -= G * (hasTrait('b3p2') ? 1.1 : 1) * (P.vy < 0 && hasTrait('b4p2') ? 0.7 : 1) * sdt;   // Power Jump falls 10% harder, Setter Vision floats down
+  const prevX = P.x; P.x += P.vx * sdt; P.y += P.vy * sdt;
+  let landed = false; if (P.y <= 0 && P.vy <= 0) { P.y = 0; if (!P.onGround) landed = true; }
+  const cd = courtDims(); P.x = clamp(P.x, -cd.wall + 0.5, cd.wall - 0.5);
+  if (!S.match.practice) { P.x = P.team === 'A' ? Math.min(P.x, -0.45) : Math.max(P.x, 0.45); if (P.serving && P.onGround) { const back = cd.half + 0.35; P.x = P.team === 'A' ? Math.min(P.x, -back) : Math.max(P.x, back); } }   // foot fault: no stepping over the back line until the serve is hit
   for (const n of netsFor()) {                                             // nobody walks through a net (you can reach over it, not cross it)
     const dp = prevX - n.x, dc = P.x - n.x;
-    if ((Math.sign(dp) !== Math.sign(dc) && dp !== 0) || Math.abs(dc) < 0.45) { if (Math.abs(n.x - P.x) < 3) P.x = n.x + (Math.sign(dp) || Math.sign(dc) || -1) * 0.45; }
+    if ((Math.sign(dp) !== Math.sign(dc) && dp !== 0) || Math.abs(dc) < 0.45) P.x = n.x + (Math.sign(dp) || Math.sign(dc) || -1) * 0.45;
     if (Math.abs(P.x - n.x) < 0.7) n.touchBody(P.x, P.y, BODY_H, Math.sign(P.x - n.x) < 0 ? -1 : 1);
   }
   if (landed) {
     const impV = P.vy; P.vy = 0;
     const hard = clamp(-impV / 11, 0, 1);
     P.rig.impact(-0.09 - hard * 0.15); camKick(-0.03 - hard * 0.06, 1.2 + hard * 2);
-    P.onGround = true; P.airUsed = false; P.blockUntil = 0; P.doubleSpike = false; P.dsUsed = false; P.glide = null; P.dashCharge = false;
+    P.onGround = true; P.airUsed = false; P.blockUntil = 0; P.blockLean = 0; P.rig.pitchTarget = P.dive ? P.rig.pitchTarget : 0;
     if (P.airActed) { P.landLock = T + 0.5; P.airActed = false; }           // used block / jump set on that jump: 0.5s of no jump / set / bump / dive after landing
     P.charging = false; P.swingAt = 0;
     P.rig.base = P.holding ? 'hold' : 'idle'; P.rig.setPose(P.holding ? 'hold' : 'land', P.holding ? 0 : T + 0.16);
@@ -427,20 +337,19 @@ function updatePlayer(dt) {
     landFx(P.x, P.y, groundDustColor());
   }
   if (P.emote && T - P.emote.t0 > 6) stopEmote();
-  P.rig.moveSpeed = P.onGround && !P.dive ? Math.abs(P.vx) : 0;
+  P.rig.moveSpeed = P.onGround && !P.dive ? Math.abs(P.vx) : 0; P.rig.ready = true;
   P.rig.place(P.x, P.y, P.f, P.onGround && !P.dive);
   if (P.charging) P.charge = chargeAt(T - P.chargeStart);
 }
-function groundDustColor() { return S.scene === 'match' ? (S.match.map === 'beach' ? '#f0dfae' : '#d9c7a8') : (indoors(P.x) ? '#d8c4a0' : (P.x < LOBBY.shore ? '#c8a878' : '#f3e4bb')); }
+function groundDustColor() { return S.match && S.match.map === 'beach' ? '#f0dfae' : '#d9c7a8'; }
 
 /* ---------------- Ball physics ---------------- */
-const netsFor = () => S.scene === 'match' ? (MATCH_NET ? [MATCH_NET] : []) : [LOBBY_NET];
-function inAnyCourt(x) { if (S.scene === 'match') return Math.abs(x) <= courtDims().half + BALL_R; return Math.abs(x - LOBBY.beachNet) <= COURT_L / 2 + BALL_R; }
+const netsFor = () => S.scene === 'match' && MATCH_NET ? [MATCH_NET] : [];
+function inAnyCourt(x) { return !!S.match && Math.abs(x) <= courtDims().half + BALL_R; }
 /* The ball against a net - deterministic, so every client computes the same bounce from the same hit:
    the TAPE is a stiff round cord (a ball clipping it deflects and loses a little pace - trickles over or falls back);
-   the MESH below it is soft: a ball driving into it pushes it back up to ~0.65 m past the line while it bleeds off
-   almost all of its speed, then it is pushed back out slowly and drops on its own side;
-   below the mesh the post is solid all the way to the floor (a ball never passes under a net). */
+   the MESH below it is soft: a ball driving into it pushes it back while it bleeds off almost all of its speed,
+   then it is pushed back out slowly and drops on its own side; below the mesh the post is solid to the floor. */
 function ballNets(b, px, py, h) {
   for (const n of netsFor()) {
     const dx = b.x - n.x, dxp = px - n.x;
@@ -472,39 +381,25 @@ function ballNets(b, px, py, h) {
 function timeStopFactor(x, y = 0) { if (y >= 4) return 1; for (const f of FX_LIST) if (f.type === 'timestop' && Math.abs(x - f.x) < f.r) return TIMESTOP_SLOW; return 1; }
 const BALL_STEP = 1 / 120;                       // balls always step in exact 1/120 s slices, so every client integrates the same trajectory from the same hit record
 function stepBall(b, dt) { b.acc = (b.acc || 0) + dt * timeStopFactor(b.x, b.y); let n = 0; while (b.acc >= BALL_STEP && n < 200) { simBall(b, BALL_STEP); b.acc -= BALL_STEP; n++; } }
-function ballFloor(b) { if (b.scene === 'match') return 0; return b.x < LOBBY.shore - 0.2 ? LOBBY.pierY : 0; }
+function ballFloor(b) { return 0; }
 function simBall(b, h) {
   const M = S.match; const px = b.x, py = b.y;
-  if (b.pf) {                                                            // Perfect Set: slow toward the net, then plain physics once it is there
-    const f = b.pf; const dn = b.x - f.cx;
-    if (Math.sign(dn) !== f.side || Math.abs(dn) < 0.05) { b.pf = null; b.g = 1; }
-    else { const want = f.s0 * Math.pow(0.33, Math.pow(clamp(1 - Math.abs(dn) / f.d0, 0, 1), 3)); b.vx = Math.sign(b.vx || -f.side) * want; }
-  }
   b.vy -= BALL_G * b.g * h; const dr = 1 - 0.015 * h; b.vx *= dr; b.vy *= dr;
-  if (b.scene === 'lobby' && b.y > 0.5 && !indoors(b.x)) b.vx += WIND.x * 0.35 * h;   // wind drift outside
   b.x += b.vx * h; b.y += b.vy * h;
   ballNets(b, px, py, h);
-  if (b.scene === 'match') {
-    const cd = courtDims();
-    if (Math.abs(b.x) > cd.wall - BALL_R) { b.x = Math.sign(b.x) * (cd.wall - BALL_R); b.vx *= -0.5; }
-    if (b.y > cd.ceil - BALL_R) { b.y = cd.ceil - BALL_R; b.vy *= -0.5; }
-  } else {
-    if (b.x < LOBBY.x0 + BALL_R) { b.x = LOBBY.x0 + BALL_R; b.vx = Math.abs(b.vx) * 0.5; }
-    if (b.x > LOBBY.house.x1 - BALL_R) { b.x = LOBBY.house.x1 - BALL_R; b.vx = -Math.abs(b.vx) * 0.5; }
-    for (const w of WALLS) if (b.y > w.y1 && b.y < w.y2 && Math.sign(px - w.x) !== Math.sign(b.x - w.x)) { b.x = w.x + Math.sign(px - w.x) * BALL_R; b.vx *= -0.5; }
-    if (indoors(b.x) && b.y > LOBBY.house.roof - BALL_R && py <= LOBBY.house.roof - BALL_R) { b.y = LOBBY.house.roof - BALL_R; b.vy = -Math.abs(b.vy) * 0.5; }
-  }
-  const fy = ballFloor(b);
-  if (b.y < fy + BALL_R) {
-    b.y = fy + BALL_R; b.serve = false;
+  const cd = courtDims();
+  if (Math.abs(b.x) > cd.wall - BALL_R) { b.x = Math.sign(b.x) * (cd.wall - BALL_R); b.vx *= -0.5; }
+  if (b.y > cd.ceil - BALL_R) { b.y = cd.ceil - BALL_R; b.vy *= -0.5; }
+  if (b.y < BALL_R) {
+    b.y = BALL_R; b.serve = false;
     if (!b.landed) {
-      b.landed = true; const inC = inAnyCourt(b.x); landingMark(b.x, fy, inC);
-      if (inC && b.fx && b.fx !== 'none' && b.hitter && b.hitterX !== null && b.hitType !== 'toss' && acrossNet(b.hitterX, b.x)) playScoreFx(b.fx, b.x, fy, b.hm || 'boy', P.x);
-      if (Math.abs(b.vy) > 4) puff(b.x, fy, 5, 1.2, 0.8, S.scene === 'match' && S.match && S.match.map !== 'beach' ? '#d9c7a8' : '#f0dfae');
+      b.landed = true; const inC = inAnyCourt(b.x); landingMark(b.x, 0, inC);
+      if (inC && b.fx && b.fx !== 'none' && b.hitter && b.hitterX !== null && b.hitType !== 'toss' && acrossNet(b.hitterX, b.x)) playScoreFx(b.fx, b.x, 0, b.hm || 'boy', P.x);
+      if (Math.abs(b.vy) > 4) puff(b.x, 0, 5, 1.2, 0.8, groundDustColor());
     }
-    if (b.id === 'match' && M && !M.practice && M.state === 'rally' && isHost()) hostBallLanded();   // the point is decided, but the ball keeps its physics until the next serve
+    if (M && !M.practice && M.state === 'rally' && isHost()) hostBallLanded();   // the point is decided, but the ball keeps its physics until the next serve
     if (Math.abs(b.vy) < 1.2) { b.vy = 0; b.vx *= 0.97; } else b.vy *= -0.55;
-    b.vx *= 0.85; b.spin = -b.vx / BALL_R * 0.9; b.g = 1; b.pf = null;   // a spike's flight gravity ends at the first bounce
+    b.vx *= 0.85; b.spin = -b.vx / BALL_R * 0.9; b.g = 1; b.pf = null;   // a shot's flight gravity ends at the first bounce
   }
   b.rot += b.spin * h;
 }
@@ -520,7 +415,7 @@ function updateBalls(dt) {
     if (b.tapeT === T) for (const n of netsFor()) if (Math.abs(b.x - n.x) < 1) n.kick(3);
     if (b.skin === 'fire' && !ULTRA && Math.hypot(b.vx, b.vy) > 3 && Math.random() < 0.6) addPart({ kind: 'dot', x: b.x, y: b.y, vx: -b.vx * 0.1, vy: 0.6, g: -1, drag: 2, life: 0.35, size: 0.1, col: Math.random() < 0.5 ? '#ffb02a' : '#ff5a1f' });
   }
-  if (T < P.blockUntil && !P.blockHit && ballReach(highX(), highY() + 0.2, 1.6, 1, true) && B.hitter !== SID && B.vx * netDir() < 0) blockContact();   // blocks may reach over the net
+  if (T < P.blockUntil && !P.blockHit && ballReach(highX() + P.f * P.blockLean * 0.6, highY() + 0.2, 1.6, 1, true) && B.hitter !== SID && B.vx * netDir() < 0) blockContact();   // blocks may reach over the net, and lean with you
   if (P.dive && !P.dive.hit && ballReach(P.x + P.dive.dir * 1.0, P.y + 0.6, 1.8)) diveContact();
 }
 /* ---- "TOO LOW" popup at the ball ---- */
@@ -532,7 +427,6 @@ function ballRecord(b) { return { active: b.active, held: b.held || null, frozen
 function writeBall(b) {
   if (!b || !S.online) return;
   if (b.id === 'match') { const r = mref('ball'); if (r) r.set(ballRecord(b)); }
-  else db.ref('lobbyBalls/' + b.id).set(ballRecord(b));
 }
 function receiveBall(b, v) {
   if (!b || !v || v.by === SID || !v.d2) return;
@@ -546,7 +440,7 @@ function receiveBall(b, v) {
   if (b.active && !b.held) {
     const bx = b.x + b.visX, by = b.y + b.visY; const wasShown = b.scene === S.scene;
     b.x = v.x; b.y = v.y; b.vx = v.vx; b.vy = v.vy; b.acc = 0;
-    if (newHit) { if (v.ds) lightningFx(b.x, b.y, b.vx, b.vy); else sparkle(b.x, b.y, 12, '#ffffff', 1.2, 0.2, 0.3, 0.035, b.vx / 30, b.vy / 30); }
+    if (newHit) { spikeRing(b.x, b.y, b.vx, b.vy); sparkle(b.x, b.y, 14, '#ffffff', 1.3, 0.2, 0.3, 0.035, b.vx / 30, b.vy / 30); }
     const dt = clamp((snow() - b.t) / 1000, 0, 0.6);
     if (!b.frozen && dt > 0) { let left = dt; while (left > 1e-6) { const hh = Math.min(BALL_STEP, left); simBall(b, hh); left -= hh; } }   // catch up with the same fixed-step physics everyone runs
     if (wasShown && !newHit) { const ox = bx - b.x, oy = by - b.y; if (Math.hypot(ox, oy) < 1.5) { b.visX = ox; b.visY = oy; } else { b.visX = b.visY = 0; } } else { b.visX = b.visY = 0; }
@@ -554,17 +448,12 @@ function receiveBall(b, v) {
   }
   if (b.id === 'match') hostCheckHit();
 }
-const JOIN_T = Date.now();
-db.ref('lobbyBalls').on('child_added', s => { const v = s.val(); if (!v || !v.d2) return; if ((v.t || 0) < JOIN_T - 20000 && (Math.abs(v.vx || 0) + Math.abs(v.vy || 0) < 0.5)) { s.ref.remove(); return; } const b = balls.get(s.key) || makeBall(s.key, 'lobby'); receiveBall(b, v); });
-db.ref('lobbyBalls').on('child_changed', s => { const v = s.val(); if (!v || !v.d2) return; const b = balls.get(s.key) || makeBall(s.key, 'lobby'); receiveBall(b, v); });
-db.ref('lobbyBalls').on('child_removed', s => { if (s.key !== SID) removeBall(s.key); });
-
 /* ---------------- Remote players ---------------- */
 const remotes = new Map();
 function remoteUpsert(sid, d) {
   if (sid === SID || !d || !d.d2) return;
   let r = remotes.get(sid);
-  const variant = TEAM_VARIANT[d.team] || 'white'; const model = d.md || 'boy';
+  const variant = TEAM_VARIANT[d.team] || 'white'; const model = 'boy';
   if (r && (r.rig.variant !== variant || r.rig.model !== model)) { remoteRemove(sid); r = null; }
   if (!r) {
     const rig = new Rig2D(variant, model); rig.place(d.x || 0, d.y || 0, d.f || 1, true);
@@ -613,12 +502,12 @@ function updateRemotes(dt) {
     else { const a = 18 + Math.min(42, Math.hypot(tx - r.x, ty - r.y) * 14), e = Math.exp(-a * dt), inv = 1 / a; const ease = (cur, t1, t0) => { const v = clamp((t1 - t0) / Math.max(dt, 1e-4), -25, 25); return t1 - v * inv + (cur - t0 + v * inv) * e; }; r.x = ease(r.x, tx, r.px); r.y = ease(r.y, ty, r.py); }
     r.px = tx; r.py = ty;
     const grounded = !!(r.data && r.data.g);
-    if (!r.wasAir && !grounded) { jumpFx(r.x, r.y, '#f0dfae'); r.rig.impact(0.14); }
+    if (!r.wasAir && !grounded) { jumpFx(r.x, r.y, groundDustColor()); r.rig.impact(0.14); }
     if (r.wasAir && grounded) r.rig.impact(-0.17);
     r.wasAir = !grounded;
     r.speed = lerp(r.speed, Math.abs(r.x - px) / Math.max(dt, 0.001), Math.min(1, dt * 7));
     r.rig.moveSpeed = r.rig.anim === 'idle' ? r.speed : 0;
-    r.rig.place(r.x, r.y, (r.data && r.data.f) || 1, grounded);
+    r.rig.ready = true; r.rig.place(r.x, r.y, (r.data && r.data.f) || 1, grounded);
     r.rig.update(dt, T);
     for (const n of netsFor()) if (Math.abs(r.x - n.x) < 0.7) n.touchBody(r.x, r.y, BODY_H, r.x < n.x ? -1 : 1);
   }
@@ -632,7 +521,7 @@ function myState() {
    axes the keyboard drives). Round buttons press the same key codes the keyboard would. Buttons can be dragged
    anywhere in Menu > Settings > Controls > Edit layout; the layout is saved per device. */
 const TOUCH = { on: false, x: 0, y: 0, edit: false, joyId: null, joyOrigin: null, pressed: new Map(), layout: null, drag: null };
-const TOUCH_DEFAULT = { jump: [30, 110], action: [130, 40], q: [40, 212], e: [140, 150], dive: [230, 60], dash: [230, 140], emote: [320, 26], menu: [320, 100], ball: [400, 26], serve: [470, 26] };   // [right, bottom] in px
+const TOUCH_DEFAULT = { jump: [30, 110], action: [130, 40], q: [40, 212], e: [140, 150], dive: [230, 60], emote: [320, 26], menu: [320, 100], ball: [400, 26], serve: [470, 26] };   // [right, bottom] in px
 function touchWanted() { let pref = 'auto'; try { pref = localStorage.getItem('vg_touch') || 'auto'; } catch (e) { } if (pref === 'on') return true; if (pref === 'off') return false; const touch = 'ontouchstart' in window || navigator.maxTouchPoints > 0; return touch && (matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod|Mobile|CrOS.*Touch/i.test(navigator.userAgent)); }
 function applyTouch(on) {
   TOUCH.on = on; $('#touchUi').classList.toggle('hidden', !on); document.body.classList.toggle('touch', on);
@@ -648,17 +537,16 @@ function touchCode(act) {
     case 'jump': return KEYS.jump;
     case 'action': return P.holding ? KEYS.toss : P.onGround ? KEYS.groundSet : KEYS.spike;
     case 'q': return P.onGround ? KEYS.bump : KEYS.block;
-    case 'e': return P.onGround ? KEYS.interact : KEYS.jumpSet;
-    case 'dive': return KEYS.dive; case 'dash': return KEYS.ability; case 'emote': return KEYS.emote; case 'ball': return KEYS.spawnBall; case 'serve': return KEYS.serve;
+    case 'e': return KEYS.jumpSet;
+    case 'dive': return KEYS.dive; case 'emote': return KEYS.emote; case 'ball': return KEYS.spawnBall; case 'serve': return KEYS.serve;
   } return null;
 }
 function updateTouchLabels() {
   if (!TOUCH.on) return;
-  const ground = P.onGround, hold = P.holding, spawn = canSpawnHere(); const near = !!nearNPC();
+  const ground = P.onGround, hold = P.holding, spawn = canSpawnHere();
   const set = (act, text, show = true, dim = false) => { const b = $(`#touchUi .tbtn[data-act="${act}"]`); if (!b) return; if (!TOUCH.edit) b.style.display = show ? '' : 'none'; if (b.dataset.txt !== text) { b.dataset.txt = text; b.textContent = text; } b.classList.toggle('dim', dim && !TOUCH.edit); };
   set('action', hold ? 'TOSS' : ground ? 'SET' : 'SPIKE'); set('q', ground ? 'BUMP' : 'BLOCK');
-  set('e', ground ? (near ? 'TALK' : 'JUMP SET') : 'JUMP SET', true, ground && !near); set('dive', 'DIVE', true, !ground);
-  const dash = hasTrait('b3a'); const cd = Math.max(0, (P.dashReady || 0) - T); set('dash', cd > 0 ? cd.toFixed(1) : 'DASH', dash, cd > 0);
+  set('e', 'JUMP SET', true, ground); set('dive', 'DIVE', true, !ground);
   set('ball', 'BALL', spawn); set('serve', 'SERVE', spawn); set('jump', 'JUMP', true, !ground); set('emote', 'EMOTE'); set('menu', 'MENU');
 }
 (function initTouch() {
@@ -691,7 +579,8 @@ function updateTouchLabels() {
   $('#touchEditBtn').onclick = () => { closePanels(); if (!TOUCH.on) applyTouch(true); TOUCH.edit = true; ui.classList.add('edit'); $('#touchEdit').classList.remove('hidden'); $$('#touchUi .tbtn').forEach(b => { b.style.display = ''; }); };
   $('#touchSel').onchange = () => { try { localStorage.setItem('vg_touch', $('#touchSel').value); } catch (e) { } applyTouch(touchWanted()); };
   try { $('#touchSel').value = localStorage.getItem('vg_touch') || 'auto'; } catch (e) { }
-  canvas.addEventListener('touchstart', e => { if (TOUCH.on) e.preventDefault(); }, { passive: false });
+  const aimTouch = e => { if (!TOUCH.on) return; e.preventDefault(); const t = e.changedTouches[0]; MOUSE.x = t.clientX; MOUSE.y = t.clientY; };   // on a touch screen the last tap on the court is the cursor
+  canvas.addEventListener('touchstart', aimTouch, { passive: false }); canvas.addEventListener('touchmove', aimTouch, { passive: false });
   addEventListener('resize', () => { if (TOUCH.on) layoutTouch(); });
 })();
 
@@ -702,22 +591,13 @@ function addBubble(sid, text) { if (!sid || !text) return; let b = BUBBLES.get(s
 function sidForName(n) { for (const [sid, r] of remotes) if ((r.data && r.data.name) === n) return sid; return n === me.name ? SID : null; }
 
 /* ---------------- Camera ---------------- */
-let LOBBY_ZOOM = 1; try { LOBBY_ZOOM = clamp((parseInt(localStorage.getItem('vg_zoom2d') || '100', 10) || 100) / 100, 0.7, 1.4); } catch (e) { }
-let camKickK = 0, camShake = 0; const camT = { x: P.x, y: 3 }; let camInit = false;
+let camKickK = 0, camShake = 0;
 function camKick(zoom, shake) { camKickK = clamp(camKickK + zoom, -0.2, 0.2); camShake = Math.min(0.6, camShake + shake * 0.03); }
 function updateCamera(dt) {
   camKickK *= Math.exp(-dt * 7); camShake *= Math.exp(-dt * 9);
   if (S.scene === 'match') {
     const cd = courtDims(); const s = Math.min(VW / (2 * (cd.half + 4.6)), VH / 12.2) * (1 + camKickK * 0.25);
     CAM.s = s; CAM.x = 0; CAM.y = 0.31 * VH / s;   // the floor band keeps the bottom fifth of the screen, under the action cards
-  } else {
-    const s = VH / 12.5 * LOBBY_ZOOM * (1 + camKickK * 0.25); CAM.s = s;
-    const tx = P.x + clamp(P.vx, -9, 9) * 0.18, ty = P.y + 2.9;
-    if (!camInit) { camT.x = tx; camT.y = ty; camInit = true; }
-    camT.x += (tx - camT.x) * smoothT(5, dt); camT.y += (ty - camT.y) * smoothT(4, dt);
-    const hw = VW / 2 / s, hh = VH / 2 / s;
-    CAM.x = clamp(camT.x, LOBBY.x0 - 1 + hw, LOBBY.x1 + 1 - hw); if (LOBBY.x1 - LOBBY.x0 + 2 < hw * 2) CAM.x = (LOBBY.x0 + LOBBY.x1) / 2;
-    CAM.y = Math.max(camT.y, -2.4 + hh); if (indoors(P.x) || P.onStairs) CAM.y = Math.min(CAM.y, LOBBY.house.roof + 1.8 - hh + 0.001 > -1.6 + hh ? LOBBY.house.roof + 1.8 - hh : CAM.y);
   }
   if (camShake > 0.002) { const st = performance.now() * 0.001; shakeX = Math.sin(st * 47) * camShake * 10; shakeY = Math.sin(st * 61 + 1.7) * camShake * 10; } else { shakeX = shakeY = 0; }
 }
@@ -726,49 +606,34 @@ function updateCamera(dt) {
 const CARD_SETS = {
   ground: [['bump', 'BUMP', 'bump'], ['groundSet', 'SET', 'set'], ['dive', 'DIVE', 'dive']],
   air: [['block', 'BLOCK', 'block'], ['jumpSet', 'JUMP SET', 'set'], ['spike', 'SPIKE', 'spikeHit', true]],
-  dash: ['ability', 'DASH', 'dash'],
   hold: [['toss', 'TOSS', 'toss']],
 };
 let cardSig = '', utilSig = '';
 function cardHtml(act, label, pose, hold, cd = 0) { return `<div class="card${hold ? ' hold' : ''}"><img src="${ICONS[pose] || ''}" alt=""><div class="key">${keyName(KEYS[act])}</div>${cd > 0 ? `<div class="cdov" style="height:${Math.min(100, cd / 4 * 100).toFixed(0)}%"></div><div class="cdt">${cd.toFixed(1)}</div>` : ''}<div class="lbl">${label}</div></div>`; }
 function updateCards() {
   const set = P.holding ? 'hold' : P.onGround ? 'ground' : 'air';
-  const dash = set !== 'hold' && hasTrait('b3a'); const dcd = dash ? Math.max(0, (P.dashReady || 0) - T) : 0;
-  const hide = menuOpen();
-  const sig = hide + set + '|' + CARD_SETS[set].map(c => KEYS[c[0]]).join(',') + (dash ? '|D' + KEYS.ability + ':' + Math.ceil(dcd * 10) : '');
-  if (sig !== cardSig) { cardSig = sig; $('#actions').innerHTML = hide ? '' : CARD_SETS[set].map(c => cardHtml(...c)).join('') + (dash ? cardHtml(...CARD_SETS.dash, false, dcd) : ''); }
+  const hide = menuOpen() || !inMatch();
+  const sig = hide + set + '|' + CARD_SETS[set].map(c => KEYS[c[0]]).join(',');
+  if (sig !== cardSig) { cardSig = sig; $('#actions').innerHTML = hide ? '' : CARD_SETS[set].map(c => cardHtml(...c)).join(''); }
   updateTouchLabels();
-  const show = !hide && ((S.match && S.match.practice) || (S.scene === 'lobby' && !indoors(P.x)));
+  const show = !hide && S.match && S.match.practice;
   const usig = (show ? 1 : 0) + '|' + KEYS.spawnBall + KEYS.serve;
   if (usig !== utilSig) { utilSig = usig; $('#utilCards').classList.toggle('hidden', !show); $('#utilCards').innerHTML = show ? cardHtml('spawnBall', 'SPAWN BALL', 'ball') + cardHtml('serve', 'SERVE', 'ball') : ''; }
 }
 
-/* ---------------- NPCs: the three dealers stand in the lobby; talking to one opens the menu on their shop ---------------- */
-function nearNPC() { if (S.scene !== 'lobby') return null; for (const n of NPCS) if (Math.abs(P.x - n.x) < 2.3 && Math.abs(P.y - n.y) < 1) return n; return null; }
-function talkNPC(n) { shopTab = n.tab; openMenu('shop'); }
-function updateNPCs(dt) {
-  if (S.scene !== 'lobby') return;
-  for (const n of NPCS) {
-    if (!n.rig) { n.rig = new Rig2D(n.variant, n.variant); n.rig.place(n.x, n.y, 1, true); n.rig.snap(); }
-    if (Math.abs(P.x - n.x) < 9 && Math.abs(P.y - n.y) < 2) n.f = P.x < n.x ? -1 : 1;
-    n.rig.place(n.x, n.y, n.f, true); n.rig.update(dt, T);
-  }
-}
-
 /* ---------------- Shop (in the menu) ---------------- */
 let shopTab = 'skins';
-const DEALER_OF = { skins: 'lil', models: 'lil', fx: 'lil', emotes: 'woman', boxes: 'big' };
-const DEALER_INFO = { lil: ['Lil Man Dealer', 'dealer', 'Balls, characters and score effects. Find him downstairs in the beach house.'], woman: ['Lil Woman Dealer', 'wdealer', 'Emotes. She works the hut at the end of the pier.'], big: ['Big Man Dealer', 'bigdealer', 'Trait boxes: 3 cards each - 2 passives and 1 ability. He is upstairs in the beach house.'] };
+const DEALER_OF = { skins: 'lil', fx: 'lil', emotes: 'woman', boxes: 'big' };
+const DEALER_INFO = { lil: ['Lil Man Dealer', '🏐', 'Balls and score effects.'], woman: ['Lil Woman Dealer', '💃', 'Emotes for your wheel.'], big: ['Big Man Dealer', '🎁', 'Trait boxes: 2 passive traits in each, 50 / 50.'] };
 const SHOP_KINDS = {
   skins:  { items: SKINS, icon: 'skin_', owned: () => me.skins, cur: () => me.skin, def: 'default', ownedKey: 'skins', curKey: 'skin', note: 'Ball skins. Same size, same hitbox - looks only.' },
-  models: { items: MODELS, icon: 'model_', owned: () => me.models, cur: () => me.model, def: 'boy', ownedKey: 'models', curKey: 'model', note: 'Characters. Pick who you play as.' },
   fx:     { items: FXS, icon: 'fx_', owned: () => me.fxs, cur: () => me.fx, def: 'none', ownedKey: 'fxs', curKey: 'fx', note: 'Score effects play where a ball you hit lands in, across the net.' },
   emotes: { items: EMOTES, icon: 'emote_', owned: () => me.emotes, cur: () => null, def: null, ownedKey: 'emotes', curKey: null, note: 'Equipped emotes go on your emote wheel (8 slots).', multi: true },
 };
 $$('#shopTabs button').forEach(b => b.onclick = () => { shopTab = b.dataset.tab; renderShop(); });
 function renderShop() {
   $$('#shopTabs button').forEach(b => b.classList.toggle('on', b.dataset.tab === shopTab));
-  const dealer = DEALER_INFO[DEALER_OF[shopTab]]; $('#shopTitle').textContent = dealer[0]; drawPortraitTo($('#dealerPic'), dealer[1], dealer[1]);
+  if (!DEALER_OF[shopTab]) shopTab = 'skins'; const dealer = DEALER_INFO[DEALER_OF[shopTab]]; $('#shopTitle').textContent = dealer[0]; $('#dealerPic').textContent = dealer[1];
   const grid = $('#shopGrid'); grid.innerHTML = '';
   $('#traitPeek').classList.toggle('hidden', shopTab !== 'boxes');
   if (shopTab === 'boxes') { $('#shopNote').textContent = dealer[2]; renderTraitShop(); return; }
@@ -801,25 +666,26 @@ function equipItem(kind, id) {
 // Every box holds 3 cards: 2 passives (blue) + 1 ability (red). Pull odds are the same for every box: 45 / 45 / 10.
 const TRAITS = {
   b1p1: { name: 'Quick Feet', type: 'passive', sym: 'QF', desc: '10% faster movement.' },
-  b1p2: { name: 'Fake Block', type: 'passive', sym: 'FB', desc: 'Your block tilts are reversed: Down acts like Up and Up like Down.' },
-  b1a:  { name: 'Lightning Drop', type: 'ability', sym: 'LD', desc: 'Tips rocket 3 m up, then slam straight down under heavy gravity.' },
+  b1p2: { name: 'Fake Block', type: 'passive', sym: 'FB', desc: 'Your block lean is reversed: leaning back kills, leaning in blocks soft.' },
+  b1a:  { name: 'Lightning Drop', type: 'ability', sym: 'LD', desc: 'RETIRED - abilities are gone from the game. Delete it for half its box back. Was: Tips rocket 3 m up, then slam straight down under heavy gravity.' },
   b2p1: { name: 'Spike Startup', type: 'passive', sym: 'SS', desc: 'Your spike charge bar starts at 25%.' },
-  b2p2: { name: '4th Tempo', type: 'passive', sym: '4T', desc: 'Ground sets float higher with less gravity and carry further in the direction you run.' },
-  b2a:  { name: 'Double Spike', type: 'ability', sym: 'DS', desc: 'Whiff a spike mid-air and you get one more swing - a spike only: instantly full charge, 1.2x power, lightning on contact.' },
+  b2p2: { name: '4th Tempo', type: 'passive', sym: '4T', desc: 'Your ground sets float down with 30% less gravity.' },
+  b2a:  { name: 'Double Spike', type: 'ability', sym: 'DS', desc: 'RETIRED - abilities are gone from the game. Delete it for half its box back. Was: Whiff a spike mid-air and you get one more swing - a spike only: instantly full charge, 1.2x power, lightning on contact.' },
   b3p1: { name: 'King Serve', type: 'passive', sym: 'KS', desc: '10% more serve power.' },
   b3p2: { name: 'Power Jump', type: 'passive', sym: 'PJ', desc: '20% more jump height, with 10% more gravity on the way down.' },
-  b4p1: { name: 'Speed Set', type: 'passive', sym: 'SP', desc: 'Your sets leave with 2x the horizontal speed and 1.2x the height.' },
+  b4p1: { name: 'Speed Set', type: 'passive', sym: 'SP', desc: 'Your sets reach the cursor 30% faster.' },
   b4p2: { name: 'Setter Vision', type: 'passive', sym: 'SV', desc: 'You fall at 0.7x gravity, and every player near you gets a coloured marker over their head.' },
-  b4a:  { name: 'Perfect Set', type: 'ability', sym: 'PS', desc: 'Sets aimed at the nearest net leave 3x faster, climb to just above the antennas and decay to a third of their speed as they reach the net.' },
-  b3a:  { name: 'Dash', type: 'ability', sym: 'DA', desc: 'Press your Ability key to dash (4 s cooldown). It kills your momentum and refreshes your action, your next spike starts three-quarters charged, and in the air you then glide the way you were holding.' },
+  b4a:  { name: 'Perfect Set', type: 'ability', sym: 'PS', desc: 'RETIRED - abilities are gone from the game. Delete it for half its box back. Was: Sets aimed at the nearest net leave 3x faster, climb to just above the antennas and decay to a third of their speed as they reach the net.' },
+  b3a:  { name: 'Dash', type: 'ability', sym: 'DA', desc: 'RETIRED - abilities are gone from the game. Delete it for half its box back. Was: Press your Ability key to dash (4 s cooldown). It kills your momentum and refreshes your action, your next spike starts three-quarters charged, and in the air you then glide the way you were holding.' },
 };
 const TRAIT_BOXES = {
-  1: { name: 'Trait Box 1', price: 1000, traits: ['b1p1', 'b1p2', 'b1a'] },
-  2: { name: 'Trait Box 2', price: 2000, traits: ['b2p1', 'b2p2', 'b2a'] },
-  3: { name: 'Trait Box 3', price: 5000, traits: ['b3p1', 'b3p2', 'b3a'] },
-  4: { name: 'Setter Crate', price: 3000, traits: ['b4p1', 'b4p2', 'b4a'] },
+  1: { name: 'Trait Box 1', price: 1000, traits: ['b1p1', 'b1p2'] },
+  2: { name: 'Trait Box 2', price: 2000, traits: ['b2p1', 'b2p2'] },
+  3: { name: 'Trait Box 3', price: 5000, traits: ['b3p1', 'b3p2'] },
+  4: { name: 'Setter Crate', price: 3000, traits: ['b4p1', 'b4p2'] },
 };
-const BOX_ODDS = [0.45, 0.45, 0.1];
+const BOX_ODDS = [0.5, 0.5];
+const RETIRED = { b1a: 1, b2a: 2, b3a: 3, b4a: 4 };   // the old ability traits (gone from the game): owners can still delete them for half their box back
 function rollBox(tier) { const r = Math.random(); let acc = 0; for (let i = 0; i < BOX_ODDS.length; i++) { acc += BOX_ODDS[i]; if (r < acc) return TRAIT_BOXES[tier].traits[i]; } return TRAIT_BOXES[tier].traits[2]; }
 function traitCardHtml(tid, cls = '', extra = '') { const t = TRAITS[tid]; if (!t) return ''; return `<div class="tcard ${t.type === 'ability' ? 'abl' : 'pas'} ${cls}"><div class="ty">${t.type}</div><div class="sym">${t.sym}</div><div class="tn">${t.name}</div><div class="td">${t.desc}</div>${extra}</div>`; }
 function renderTraitShop() {
@@ -840,7 +706,7 @@ async function buyBox(tier) {
   if (!res.committed) { toast(`Not enough dollars ($${bx.price.toLocaleString()} needed)`, 'err'); return; }
   toast('Bought ' + bx.name + ' - open it in Inventory > Traits', 'ok');
 }
-function hasTrait(id) { const lo = me.loadout || {}, own = me.traits || {}; return ['p1', 'p2', 'a'].some(s => lo[s] && own[lo[s]] && own[lo[s]].id === id); }
+function hasTrait(id) { const lo = me.loadout || {}, own = me.traits || {}; return ['p1', 'p2'].some(s => lo[s] && own[lo[s]] && own[lo[s]].id === id); }
 
 /* ---------------- Inventory (in the menu) ---------------- */
 let invTab = 'skins', invSel = null;
@@ -879,11 +745,11 @@ function renderTraitsTab() {
     if (tr) { const t = TRAITS[tr.id]; return `<div class="tcard slot ${type === 'ability' ? 'abl' : 'pas'}" data-slot="${label}" title="Click to unequip"><div class="ty">${t.type}</div><div class="sym">${t.sym}</div><div class="tn">${t.name}</div><div class="td">${t.desc}</div></div>`; }
     return `<div class="tcard slot empty ${type === 'ability' ? 'abl' : 'pas'}"><div class="tn">${type === 'ability' ? 'Ability' : 'Passive'}</div><div class="td">empty slot</div></div>`;
   };
-  $('#loadout').innerHTML = slot(lo.p1, 'passive', 'p1') + slot(lo.p2, 'passive', 'p2') + slot(lo.a, 'ability', 'a');
+  $('#loadout').innerHTML = slot(lo.p1, 'passive', 'p1') + slot(lo.p2, 'passive', 'p2');
   $$('#loadout .slot[data-slot]').forEach(el => el.onclick = () => unequipTrait(el.dataset.slot));
   const bag = $('#invBag'); bag.innerHTML = '';
   if (me.guest) { bag.innerHTML = '<div id="invEmpty">Log in to collect traits.</div>'; return; }
-  const equipped = new Set([lo.p1, lo.p2, lo.a].filter(Boolean));
+  const equipped = new Set([lo.p1, lo.p2].filter(Boolean));
   const boxKeys = Object.keys(boxes).sort((a, b) => (boxes[a].t || 0) - (boxes[b].t || 0));
   for (const k of boxKeys) {
     const bx = TRAIT_BOXES[boxes[k].tier]; if (!bx) continue;
@@ -893,19 +759,21 @@ function renderTraitsTab() {
   }
   const trKeys = Object.keys(own).filter(k => !equipped.has(k) && TRAITS[own[k].id]).sort((a, b) => (own[a].t || 0) - (own[b].t || 0));
   for (const k of trKeys) {
-    const w = document.createElement('div'); w.innerHTML = traitCardHtml(own[k].id, 'mini', '<button>EQUIP</button><button class="del" title="Delete this trait">X</button>');
+    const old = !!RETIRED[own[k].id];
+    const w = document.createElement('div'); w.innerHTML = traitCardHtml(own[k].id, 'mini', (old ? '<button disabled>RETIRED</button>' : '<button>EQUIP</button>') + '<button class="del" title="Delete this trait">X</button>');
     const d = w.firstChild; const [eqB, delB] = d.querySelectorAll('button'); eqB.onclick = e => { e.stopPropagation(); equipTrait(k); }; delB.onclick = e => { e.stopPropagation(); deleteTrait(k); }; bag.appendChild(d);
   }
-  if (!boxKeys.length && !trKeys.length) bag.innerHTML = '<div id="invEmpty">No traits or boxes yet - Big Man Dealer sells trait boxes upstairs (or in Shop > Trait Boxes).</div>';
+  if (!boxKeys.length && !trKeys.length) bag.innerHTML = '<div id="invEmpty">No traits or boxes yet - Big Man Dealer sells trait boxes in Shop > Trait Boxes.</div>';
 }
 function equipTrait(key) {
   const tr = (me.traits || {})[key]; if (!tr || !TRAITS[tr.id]) return;
   const Tt = TRAITS[tr.id]; const lo = Object.assign({}, me.loadout || {}); const own = me.traits;
-  if (Tt.type === 'ability') lo.a = key; else if (!lo.p1 || !own[lo.p1]) lo.p1 = key; else if (!lo.p2 || !own[lo.p2]) lo.p2 = key;
+  if (RETIRED[tr.id]) { toast('Abilities are gone from the game - delete it for a refund', 'err'); return; }
+  if (!lo.p1 || !own[lo.p1]) lo.p1 = key; else if (!lo.p2 || !own[lo.p2]) lo.p2 = key;
   else { toast('Both passive slots are full - unequip one first', 'err'); return; }
   db.ref('profiles/' + me.id + '/loadout').set(lo);
 }
-function traitRefund(tid) { for (const t in TRAIT_BOXES) if (TRAIT_BOXES[t].traits.includes(tid)) return Math.floor(TRAIT_BOXES[t].price / 2); return 0; }   // deleting a trait pays back half of its box
+function traitRefund(tid) { if (RETIRED[tid]) return Math.floor(TRAIT_BOXES[RETIRED[tid]].price / 2); for (const t in TRAIT_BOXES) if (TRAIT_BOXES[t].traits.includes(tid)) return Math.floor(TRAIT_BOXES[t].price / 2); return 0; }   // deleting a trait pays back half of its box
 async function deleteTrait(key) {
   const tr = (me.traits || {})[key]; if (!tr || me.guest) return; const Tt = TRAITS[tr.id]; if (!Tt) return;
   const refund = traitRefund(tr.id);
@@ -1044,8 +912,8 @@ function joinPartyLocal(pid) {
     if (!was) { chatLine('<span class="sys">You joined a party</span>', 'sys', 'party'); partySeen = { queued: (v.queued || {}).qid || null, start: (v.start || {}).mid || null }; }
     if (menuOpen()) { if (menuSec === 'social') renderParty(); if (menuSec === 'play') renderPlay(); }
     // the leader queued or started practice: follow them in
-    if (v.leader !== SID && v.queued && v.queued.qid !== partySeen.queued) { partySeen.queued = v.queued.qid; if (S.scene === 'lobby' && !S.queue && v.queued.players && v.queued.players[SID]) joinQueue(v.queued.mode, v.queued.qid); }
-    if (v.leader !== SID && v.start && v.start.mid !== partySeen.start) { partySeen.start = v.start.mid; if (S.scene === 'lobby' && v.start.for && v.start.for[SID]) { closePanels(); enterMatch(v.start.mid); } }
+    if (v.leader !== SID && v.queued && v.queued.qid !== partySeen.queued) { partySeen.queued = v.queued.qid; if (S.scene === 'menu' && !S.queue && v.queued.players && v.queued.players[SID]) joinQueue(v.queued.mode, v.queued.qid); }
+    if (v.leader !== SID && v.start && v.start.mid !== partySeen.start) { partySeen.start = v.start.mid; if (S.scene === 'menu' && v.start.for && v.start.for[SID]) { closePanels(); enterMatch(v.start.mid); } }
   });
   const cref = ref.child('chat'); const ccb = cref.orderByChild('ts').startAt(snow() - 1000).on('child_added', s => { const m = s.val(); if (m) { chatLine(`<b>${esc(m.n)}:</b> ${esc(m.t)}`, 'party'); addBubble(m.sid || sidForName(m.n), m.t); } });
   partyUnsub = () => { ref.off('value', cb); cref.off('child_added', ccb); };
@@ -1080,56 +948,25 @@ $('#inviteAccept').onclick = async () => {
 $('#inviteDecline').onclick = () => { const inv = inviteQueue.shift(); showInvite(); if (inv) db.ref('invites/' + SID + '/' + inv.pid).remove(); };
 
 /* =====================================================================
-   NETWORK: lobby, area servers, queue, matches
+   NETWORK: queue, matches
    ===================================================================== */
-const lobbyRef = () => db.ref('lobby/' + SID);   // on whichever area server I am on right now
 let lastSync = 0, lastSyncSig = '', lastChangeT = 0;
 function syncSelf() {
+  if (!inMatch() || S.match.local) return;
   const fast = !P.onGround || P.moving || P.dive; if (!S.online || T - lastSync < (fast ? 0.066 : 0.12)) return;
   const st = myState(); const sig = JSON.stringify(st);
   if (sig !== lastSyncSig) lastChangeT = T; else if (T - lastChangeT > 0.45) return;   // settled: after a few repeat packets, stop writing
   lastSync = T; lastSyncSig = sig;
-  if (S.scene === 'lobby') lobbyRef().set(st);
-  else if (S.match && !S.match.local) db.ref(`matches/${S.match.id}/players/${SID}`).set(st);
+  db.ref(`matches/${S.match.id}/players/${SID}`).set(st);
 }
-/* area servers: the house and the outside (beach, pier, hut) are separate Firebase projects. Walking through the
-   door hands your position over: write yourself to the new server first, then leave the old one, then swap listeners. */
-let lobbySubs = [];
-function subscribeLobby() {
-  lobbySubs.forEach(f => f()); lobbySubs = [];
-  for (const [sid, r] of Array.from(remotes)) if (!r.bot) remoteRemove(sid);   // the new server's child_added brings back everyone who is there
-  const r = db.ref('lobby');
-  const on = (ev, cb) => { const h = r.on(ev, cb); lobbySubs.push(() => r.off(ev, h)); };
-  on('child_added', s => { if (S.scene === 'lobby') remoteUpsert(s.key, s.val()); });
-  on('child_changed', s => { if (S.scene === 'lobby') remoteUpsert(s.key, s.val()); });
-  on('child_removed', s => { if (S.scene === 'lobby') remoteRemove(s.key); });
-}
-let areaCooldown = 0;
-const areaOf = x => indoors(x) ? 'house' : 'outside';
-function setArea(next) {
-  if (next === AREA || !S.online) return;
-  const oldRef = lobbyRef(); AREA = next; const newRef = lobbyRef();
-  subscribeLobby();                                                     // stop listening to the old server before leaving it
-  newRef.set(myState()); newRef.onDisconnect().remove();
-  oldRef.onDisconnect().cancel(); oldRef.remove();
-}
-function updateArea() { if (S.scene !== 'lobby' || !S.booted) return; const want = areaOf(P.x); if (want === AREA) return; if (T < areaCooldown) return; areaCooldown = T + 1.0; setArea(want); }
-function onIdentityChangedGame() { if (S.online && S.scene === 'lobby') lobbyRef().set(myState()); drawAvatar(); if (menuOpen()) showSection(menuSec); }
+function onIdentityChangedGame() { drawAvatar(); if (menuOpen()) showSection(menuSec); }
 function onProfileChanged() { if (menuOpen()) showSection(menuSec); }
-
-/* ---- the queue pads in the house: stepping on one opens PLAY on that mode; the boards count who is queued ---- */
-let padInside = null;
+const QCOUNT = {};                                  // players waiting in each online queue (shown on the mode cards)
 db.ref('queue').on('value', s => {
-  const all = s.val() || {}; const counts = {};
-  for (const mode in all) for (const id in all[mode]) { const q = all[mode][id]; if (q && q.d2 && !q.match) counts[mode] = (counts[mode] || 0) + Object.keys(q.players || {}).length; }
-  for (const id in PADS) PADS[id].count = counts[PADS[id].mode] || 0;
+  const all = s.val() || {}; for (const k in QCOUNT) delete QCOUNT[k];
+  for (const mode in all) for (const id in all[mode]) { const q = all[mode][id]; if (q && q.d2 && !q.match) QCOUNT[mode] = (QCOUNT[mode] || 0) + Object.keys(q.players || {}).length; }
+  if (menuOpen() && menuSec === 'play') renderPlay();
 });
-function checkPads() {
-  if (S.scene !== 'lobby') { padInside = null; return; }
-  let inside = null; if (P.onGround && P.y < 0.3) for (const id in PADS) if (Math.abs(P.x - PADS[id].x) <= PAD_HALF) inside = id;
-  if (inside && inside !== padInside) { selMode = PADS[inside].mode; openMenu('play'); }
-  padInside = inside;
-}
 
 /* ---------------- PLAY section: mode, online / bots, map, team (= your party), queue ---------------- */
 let selMode = '2v2', botPlay = 'online', practiceMap = 'indoor', friendsLock = false;
@@ -1141,9 +978,11 @@ $('#lockToggle').onclick = () => { friendsLock = !friendsLock; renderPlay(); };
 $('#teamInvite').onclick = () => showSection('social');
 function partyMembers() { if (!S.party) return { [SID]: { name: me.name, id: me.id } }; const out = {}; for (const sid in (S.party.members || {})) out[sid] = { name: S.party.members[sid].name, id: S.party.members[sid].id }; return out; }
 const amLeader = () => !S.party || S.party.leader === SID;
+$('#menuLeave').onclick = () => leaveMatch();
 function renderPlay() {
+  $('#inMatchPane').classList.toggle('hidden', !inMatch());
   $$('#modeCards .mode').forEach(b => b.classList.toggle('on', b.dataset.mode === selMode));
-  for (const m of ['2v2', '3v3', '6v6']) { const c = Object.values(PADS).find(p => p.mode === m); const el = $('#mc' + m); if (el) el.textContent = (m === '2v2' ? 'BEACH' : 'INDOOR') + (c && c.count ? ` · ${c.count} IN QUEUE` : ''); }
+  for (const m of ['2v2', '3v3', '6v6']) { const el = $('#mc' + m); if (el) el.textContent = (m === '2v2' ? 'BEACH' : 'INDOOR') + (QCOUNT[m] ? ` · ${QCOUNT[m]} IN QUEUE` : ''); }
   const prac = selMode === 'practice';
   $('#playMode').classList.toggle('hidden', prac); $$('#playMode button').forEach(b => b.classList.toggle('on', b.dataset.pm === botPlay));
   $('#mapPick').classList.toggle('hidden', !prac); $$('#mapPick button').forEach(b => b.classList.toggle('on', b.dataset.map === practiceMap));
@@ -1159,7 +998,7 @@ function renderPlay() {
   else if (!amLeader()) { qb.textContent = 'WAITING FOR LEADER'; qb.disabled = true; }
   else qb.textContent = prac ? 'START' : botPlay === 'bots' ? 'PLAY VS BOTS' : 'QUEUE';
   $('#queueInfo').textContent = inQ ? queueLabel() : '';
-  $('#playNote').textContent = prac ? 'Practice: free play on your own court - spawn balls, serve, try everything. Your party comes with you.' : botPlay === 'bots' ? 'A local match against computer players: 25 points, win by 2. You earn a little less than online.' : ids.length > cap ? `Your party has ${ids.length} players - too many for ${selMode}.` : 'Casual: first to 25, win by 2. Every point the serve rotates. The pads downstairs in the beach house open this too.';
+  $('#playNote').textContent = prac ? 'Practice: free play on your own court - spawn balls, serve, try everything. Your party comes with you.' : botPlay === 'bots' ? 'A local match against computer players: 25 points, win by 2. You earn a little less than online.' : ids.length > cap ? `Your party has ${ids.length} players - too many for ${selMode}.` : 'Casual: first to 25, win by 2. Every point the serve rotates. Sets go to your cursor.';
 }
 function queueLabel() { const s = Math.floor(T - queueStart); return `IN QUEUE - ${S.queue.mode.toUpperCase()} - ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; }
 $('#queueBtn').onclick = () => {
@@ -1253,7 +1092,7 @@ function onMenuClosed() { canvas.focus(); }
 /* =====================================================================
    MATCH
    ===================================================================== */
-let MATCH_NET = null; const LOBBY_NET = new Net2D(LOBBY.beachNet, 'beach');
+let MATCH_NET = null;
 let matchUnsubs = [];
 const mref = p => (S.match && !S.match.local && S.online) ? db.ref(`matches/${S.match.id}` + (p ? '/' + p : '')) : null;
 function mwrite(p, v) { const r = mref(p); if (r) r.set(v); if (S.match) applyMatchField(p, v); }
@@ -1320,7 +1159,7 @@ async function enterMatch(mid) {
 }
 function enterLocalPractice(map = 'indoor') { beginMatch({ id: 'local', mode: 'practice', practice: true, map, teams: { A: { [SID]: { name: me.name } }, B: {} }, players: {}, score: { A: 0, B: 0 }, state: 'practice', serve: null, serveIdx: {}, msg: '', local: true }); }
 function setMyRig(variant) {
-  const model = me.model || 'boy';
+  const model = 'boy';
   if (P.rig && P.rig.variant === variant && P.rig.model === model) return;
   const base = P.rig ? P.rig.base : 'idle'; P.rig = new Rig2D(variant, model); P.rig.base = base; P.rig.setPose(base); P.rig.place(P.x, P.y, P.f, P.onGround); P.rig.snap();
 }
@@ -1328,9 +1167,7 @@ function onCosmeticsChanged() { if (P.rig) setMyRig(P.rig.variant); drawAvatar()
 function beginMatch(M) {
   M.enteredAt = T; M.absentSince = 0;
   cancelQueue(false);
-  S.match = M; S.scene = 'match'; closePanels(); remotesClear(); BOTS.length = 0;
-  if (S.online) { lobbyRef().remove(); db.ref('lobbyBalls/' + SID).remove(); }
-  removeBall(SID);
+  S.match = M; S.scene = 'match'; closePanels(); remotesClear(); BOTS.length = 0; document.body.classList.add('inMatch'); document.body.classList.remove('inMenu');
   MATCH_NET = new Net2D(0, M.map === 'beach' ? 'beach' : 'indoor');
   P.team = M.teams.B && M.teams.B[SID] ? 'B' : 'A';
   resetToSpawn(); setMyRig(TEAM_VARIANT[P.team]); P.rig.base = 'idle'; P.rig.setPose('idle');
@@ -1378,12 +1215,11 @@ function leaveMatch() {
   BOTS.length = 0;
   matchUnsubs.forEach(f => f()); matchUnsubs = [];
   if (!M.local && S.online) { const r = db.ref('matches/' + M.id); const pref = r.child('players/' + SID); pref.onDisconnect().cancel(); pref.remove().then(() => r.child('players').once('value')).then(s => { if (!s.exists()) r.remove(); }); }
-  S.match = null; S.scene = 'lobby'; remotesClear(); removeBall('match'); B = null; MATCH_NET = null;
-  if (S.online) db.ref('lobby').once('value').then(s => { if (S.scene !== 'lobby') return; s.forEach(c => { remoteUpsert(c.key, c.val()); }); });
-  P.x = LOBBY_SPAWN.x; P.y = LOBBY_SPAWN.y; P.vx = P.vy = 0; P.f = 1; P.onGround = true; P.onStairs = false; P.holding = false; P.serveMode = false; P.serving = false; P.servedKey = null; P.dive = null; P.charging = false; camInit = false;
+  S.match = null; S.scene = 'menu'; remotesClear(); removeBall('match'); B = null; MATCH_NET = null; FX_LIST.length = 0; PARTS.length = 0;
+  P.x = -4; P.y = 0; P.vx = P.vy = 0; P.f = 1; P.onGround = true; P.holding = false; P.serveMode = false; P.serving = false; P.servedKey = null; P.dive = null; P.charging = false; keys.clear();
   setMyRig('white'); P.rig.base = 'idle'; P.rig.setPose('idle'); P.rig.pitchTarget = 0;
   $('#matchHud').classList.add('hidden'); $('#bigMsg').textContent = '';
-  if (S.online) { AREA = areaOf(P.x); subscribeLobby(); lobbyRef().set(myState()); lobbyRef().onDisconnect().remove(); }
+  document.body.classList.remove('inMatch'); openMenu('play');
 }
 $('#leaveBtn').onclick = () => leaveMatch();
 function updateMatchHud() {
@@ -1415,10 +1251,10 @@ function updateMatchHud() {
                (2s: kill block or one-touch 50/50, 3s+: only the setter blocks and only one-touches)
    ===================================================================== */
 const BOTS = [];
-const BOT_NAMES = [['Bob', 'boy'], ['Greg', 'boy'], ['Emily', 'girl'], ['Dave', 'boy'], ['Sarah', 'girl'], ['Karen', 'girl'], ['Steve', 'boy'], ['Linda', 'girl'], ['Kevin', 'boy'], ['Jenny', 'girl'], ['Frank', 'boy'], ['Nancy', 'girl']];
+const BOT_NAMES = [['Bob', 'boy'], ['Greg', 'boy'], ['Emily', 'boy'], ['Dave', 'boy'], ['Sarah', 'boy'], ['Karen', 'boy'], ['Steve', 'boy'], ['Linda', 'boy'], ['Kevin', 'boy'], ['Jenny', 'boy'], ['Frank', 'boy'], ['Nancy', 'boy']];
 const BOT_SPEED = 6.6, BOT_REACH_G = 1.6, BOT_REACH_A = 1.7;
 function makeBot(id, name, model, team, idx, n) {
-  const rig = new Rig2D(TEAM_VARIANT[team], model);
+  const rig = new Rig2D(TEAM_VARIANT[team], 'boy', 1 + (idx + (team === 'B' ? 3 : 0)) % (HAIRS.length - 1)); rig.ready = true;   // same athlete, different hair so you can tell them apart
   const bot = { id, name, model, team, idx, n, rig, x: spawnX(team, idx, n), y: 0, vx: 0, vy: 0, onGround: true, f: -teamSide(team), target: null, role: 'player', plan: null, blockUntil: 0, blockTilt: -1, spike: null, lastHitT: -9, serveAt: 0, coin: 0, base: 0 };
   bot.base = bot.x; rig.place(bot.x, 0, bot.f, true); rig.snap();
   remotes.set(id, { bot: true, rig, name, data: { team, name, f: bot.f, g: 1 }, x: bot.x, y: 0 });   // name tags and bubbles treat it like a player
@@ -1463,7 +1299,7 @@ function botHit(bot, type, vx, vy, g = 1) {
   b.prevHitter = b.hitter; b.prevType = b.hitType; b.hitter = bot.id; b.hitType = type; b.fx = 'none'; b.hm = bot.model; b.hitterX = bot.x; b.hitAtT = T;
   if (type === 'block') { b.touches = 0; b.sideTeam = bot.team; } else { if (b.sideTeam !== bot.team) { b.sideTeam = bot.team; b.touches = 1; } else b.touches++; }
   b.serve = false; b.spin = (Math.random() - 0.5) * 8 - vx * 1.5; b.landed = false; b.ds = false;
-  if (type === 'spike') sparkle(b.x, b.y, 12, '#ffffff', 1.2, 0.2, 0.3, 0.035, vx / 30, vy / 30);
+  if (type === 'spike') { spikeRing(b.x, b.y, vx, vy); sparkle(b.x, b.y, 14, '#ffffff', 1.3, 0.2, 0.3, 0.035, vx / 30, vy / 30); }
   if (type === 'bump') { bot.rig.setPose('bump', T + 0.45); setTimeout(() => actionFx('bump', bot.x, bot.y, bot.f), 60); }
   else if (type === 'set') { bot.rig.setPose('set', T + 0.45); if (!bot.onGround) bot.rig.base = 'airDown'; setTimeout(() => actionFx('set', bot.x, bot.y, bot.f), 80); }
   else if (type === 'spike' || type === 'tip') { bot.rig.setPose(type === 'tip' ? 'tip' : 'spikeHit', T + 0.4); bot.rig.base = 'airDown'; actionFx('spike', bot.x, bot.y, bot.f); }
@@ -1530,8 +1366,8 @@ function planTeam(team, bots) {
       if (recv && recv.misread) recv.target = land - s * 1.2;
       if (recv && !recv.misread && botReach(recv, false) && botMayTouch(recv) && (b.vy < 1 || b.y < 1.6)) {   // touch 1: a high pass up to the setter spot
         const shank = Math.random() < Math.min(0.35, 0.08 + Math.hypot(b.vx, b.vy) / 120);   // the harder it comes, the likelier a bad pass
-        const v = shank ? launchTo(b.x, b.y, setterSpot(team) + (Math.random() - 0.3) * 6 * s, 0, Math.max(3.5, b.y + 1.5 + Math.random() * 3)) : launchTo(b.x, b.y, setterSpot(team), 0, Math.max(7.5, b.y + 3.75));
-        botHit(recv, b.y < 1.0 ? 'bump' : 'set', v.x, v.y, 1);
+        const v = shank ? launchTo(b.x, b.y, setterSpot(team) + (Math.random() - 0.3) * 6 * s, 0, Math.max(3.5, b.y + 1.5 + Math.random() * 3), BALL_G * BUMP_G) : launchTo(b.x, b.y, setterSpot(team), 0, Math.max(7.5, b.y + 3.75), BALL_G * BUMP_G);
+        botHit(recv, b.y < 1.0 ? 'bump' : 'set', v.x, v.y, BUMP_G);
         recv.plan = 'toAttack'; recv.target = spots.front;
       }
     } else if (oursTouches === 1) {                                                                     // SET
@@ -1650,20 +1486,18 @@ function rrScreen(x, y, w, h, r, fill) { C.beginPath(); C.moveTo(x + r, y); C.ar
 function render(dt) {
   C = ctx; ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalAlpha = 1; ctx.globalCompositeOperation = 'source-over';
   const M = S.match; const cd = M ? courtDims() : null;
-  if (S.scene === 'lobby') drawLobbyWorld(T);
-  else if (M.map === 'beach') drawBeachCourt(T, cd); else drawGym(T, cd);
+  if (!M) { drawMenuScene(T, dt); drawParts(); drawFx('mid'); screenTf(); const tint = PAL.tint; if (tint[3] > 0.005) { C.fillStyle = `rgba(${tint[0] | 0},${tint[1] | 0},${tint[2] | 0},${tint[3].toFixed(3)})`; C.fillRect(0, 0, VW, VH); } return; }
+  if (M.map === 'beach') drawBeachCourt(T, cd); else drawGym(T, cd);
   worldTf();
   drawFx('back');
   for (const n of netsFor()) if (onScreen(n.x - 1, n.x + 1)) n.draw(T);
-  if (S.scene === 'lobby') for (const n of NPCS) if (n.rig && onScreen(n.x - 2, n.x + 2)) n.rig.draw();
   for (const r of remotes.values()) if (onScreen(r.x - 2, r.x + 2)) r.rig.draw();
   P.rig.draw();
   for (const b of balls.values()) { if (b.scene !== S.scene || !b.active) continue; const x = b.x + b.visX, y = b.y + b.visY; if (!onScreen(x - 1, x + 1)) continue; ellipse(x, ballFloor(b) + 0.02, 0.32 * clamp(1 - (y - ballFloor(b)) * 0.05, 0.3, 1), 0.07, 0, `rgba(0,0,0,${clamp(0.3 - y * 0.02, 0.06, 0.3)})`); drawBallSkin(x, y, b.skin, b.rot, T, BALL_R, !b.held && b.hitter === SID && b.hitType !== 'toss'); }
-  if (S.scene === 'lobby') drawLobbyFront(T);
   drawMarks(dt); drawParts(); drawFx('mid');
   // ---- screen space ----
   screenTf();
-  const outside = S.scene === 'lobby' ? !indoors(CAM.x) : M.map === 'beach';
+  const outside = M.map === 'beach';
   const tint = PAL.tint; if (tint[3] > 0.005) { C.fillStyle = `rgba(${tint[0] | 0},${tint[1] | 0},${tint[2] | 0},${(tint[3] * (outside ? 1 : 0.45)).toFixed(3)})`; C.fillRect(0, 0, VW, VH); }
   if (skyFlash > 0) { C.fillStyle = `rgba(235,240,255,${skyFlash * 0.55})`; C.fillRect(0, 0, VW, VH); skyFlash = Math.max(0, skyFlash - dt * 3); }
   // name tags + bubbles
@@ -1677,15 +1511,12 @@ function render(dt) {
     drawBubbles(sid, sx, top);
   }
   drawBubbles(SID, toSX(P.x), toSY(P.rig.headTop()) - 4);
-  if (S.scene === 'lobby') {
-    for (const n of NPCS) { if (!n.rig || !onScreen(n.x - 3, n.x + 3) || Math.abs(P.y - n.y) > 3) continue; drawTag(toSX(n.x), toSY(n.rig.headTop()), n.name, '#ffd23f', 14); }
-    const n = nearNPC(); if (n && !uiOpen()) { const sx = toSX(n.x), sy = toSY(n.rig.headTop()) - 22; const txt = `Talk to ${n.name}`; C.font = '900 13px Montserrat, Arial'; const w = C.measureText(txt).width + 44; rrScreen(sx - w / 2, sy - 26, w, 26, 8, 'rgba(14,21,48,.88)'); rrScreen(sx - w / 2 + 5, sy - 22, 22, 18, 5, '#fff'); C.fillStyle = '#111'; C.textAlign = 'center'; C.textBaseline = 'middle'; C.fillText(keyName(KEYS.interact), sx - w / 2 + 16, sy - 13); C.fillStyle = '#fff'; C.textAlign = 'left'; C.fillText(txt, sx - w / 2 + 33, sy - 13); }
-    if (P.onGround && !P.onStairs && P.y < 0.3 && P.x >= STAIRS.x2 - 1.0 && P.x <= STAIRS.x2 + 1.4) { const sx = toSX(P.x), sy = toSY(P.rig.headTop()) - 8; drawTag(sx, sy, `${keyName(KEYS.moveF)} to climb the stairs`, '#ffd23f', 12); }
-  }
   // charge bar
-  if (P.charging) { const sx = toSX(P.x) + 34 * (P.f > 0 ? -1 : 1) - 6, sy = toSY(P.y + 1.4) - 55; rrScreen(sx - 2, sy - 2, 16, 114, 5, P.doubleSpike ? '#9fd4ff' : '#ffffff'); rrScreen(sx, sy, 12, 110, 4, 'rgba(0,0,0,.6)'); const h = 110 * P.charge; rrScreen(sx, sy + 110 - h, 12, Math.max(1, h), 4, P.doubleSpike ? '#9fd4ff' : '#ffd23f'); C.fillStyle = 'rgba(255,255,255,.75)'; C.fillRect(sx, sy + 110 * 0.65, 12, 2); }
+  if (P.charging) { const sx = toSX(P.x) + 34 * (P.f > 0 ? -1 : 1) - 6, sy = toSY(P.y + 1.4) - 55; rrScreen(sx - 2, sy - 2, 16, 114, 5, '#ffffff'); rrScreen(sx, sy, 12, 110, 4, 'rgba(0,0,0,.6)'); const h = 110 * P.charge; rrScreen(sx, sy + 110 - h, 12, Math.max(1, h), 4, '#ffd23f'); C.fillStyle = 'rgba(255,255,255,.75)'; C.fillRect(sx, sy + 110 * 0.65, 12, 2); }
   // serve aim
-  if (P.holding && P.serveAim !== null) { const sx = toSX(P.x + P.f * 0.3), sy = toSY(P.y) + 16; C.fillStyle = 'rgba(255,255,255,.9)'; for (const d of [-1, 1]) { C.beginPath(); C.moveTo(sx + d * 58, sy); C.lineTo(sx + d * 40, sy - 10); C.lineTo(sx + d * 40, sy + 10); C.closePath(); C.fill(); } C.fillRect(sx - 40, sy - 3, 80, 6); C.beginPath(); C.arc(sx + P.serveAim * 44, sy, 9, 0, TAU); C.fillStyle = '#e5484d'; C.fill(); C.strokeStyle = '#000'; C.lineWidth = 2; C.stroke(); }
+  if (P.holding && P.serveAim !== null) { const sx = toSX(P.x + P.f * 0.3), sy = toSY(P.y) + 16; C.fillStyle = 'rgba(255,255,255,.9)'; for (const d of [-1, 1]) { C.beginPath(); C.moveTo(sx + d * 58, sy); C.lineTo(sx + d * 40, sy - 10); C.lineTo(sx + d * 40, sy + 10); C.closePath(); C.fill(); } C.fillRect(sx - 40, sy - 3, 80, 6); C.beginPath(); C.arc(sx + P.f * P.serveAim * 44, sy, 9, 0, TAU); C.fillStyle = '#e5484d'; C.fill(); C.strokeStyle = '#000'; C.lineWidth = 2; C.stroke(); }
+  // set aim: the peak your set would reach from here (dotted arc), capped at 2.5 nets
+  if (!uiOpen() && !P.holding && M) { const m = worldMouse(); const top = Math.min(SET_TOP(), ceilY() - 0.6); const cy = Math.min(m.y, top); const sx = toSX(m.x), sy = toSY(cy); if (m.y > top) { C.setLineDash([4, 5]); C.strokeStyle = 'rgba(255,255,255,.35)'; C.lineWidth = 1.5; C.beginPath(); C.moveTo(sx, toSY(m.y)); C.lineTo(sx, sy); C.stroke(); C.setLineDash([]); } C.beginPath(); C.arc(sx, sy, 5, 0, TAU); C.strokeStyle = 'rgba(255,255,255,.55)'; C.lineWidth = 2; C.stroke(); }
   // TOO LOW
   if (ballMsg) { if (performance.now() > ballMsg.until) ballMsg = null; else { const bx = ballMsg.b && ballMsg.b.active ? ballMsg.b.x : ballMsg.x, by = ballMsg.b && ballMsg.b.active ? ballMsg.b.y : ballMsg.y; const sx = toSX(bx), sy = toSY(by + 0.8); C.font = '900 13px Montserrat, Arial'; const w = C.measureText(ballMsg.text).width + 16; rrScreen(sx - w / 2, sy - 22, w, 22, 5, '#e5484d'); C.fillStyle = '#fff'; C.textAlign = 'center'; C.textBaseline = 'middle'; C.fillText(ballMsg.text, sx, sy - 11); } }
   // balls above the view: a marker on the top edge
@@ -1699,11 +1530,12 @@ const FIXED = 1 / 60;
 let last = performance.now(), acc = 0;
 function simulate(dt) {
   T += dt;
+  if (!inMatch()) return;
   updatePlayer(dt); P.rig.update(dt, T);
-  updateBots(dt); updateNPCs(dt);
-  updateBalls(dt); updateRemotes(dt); checkPads();
-  for (const n of netsFor()) n.step(dt, T, S.scene === 'lobby' || (S.match && S.match.map === 'beach') ? WIND.x : 0);
-  if (S.scene === 'lobby' || (S.match && S.match.map === 'beach')) updateWind();
+  updateBots(dt);
+  updateBalls(dt); updateRemotes(dt);
+  for (const n of netsFor()) n.step(dt, T, S.match.map === 'beach' ? WIND.x : 0);
+  if (S.match.map === 'beach') updateWind();
 }
 let lastFrameAt = 0;
 function tick(nowMs, headless = false) {
@@ -1711,16 +1543,16 @@ function tick(nowMs, headless = false) {
   if (!S.booted) return;
   if (headless || document.hidden) {
     acc += Math.min(dt, 6); let n = 0; while (acc >= FIXED && n < 400) { simulate(FIXED); acc -= FIXED; n++; }
-    updateFx(Math.min(dt, 0.1)); if (S.scene === 'match') updateMatchHud(); updateArea(); syncSelf();
+    updateFx(Math.min(dt, 0.1)); if (S.scene === 'match') updateMatchHud(); syncSelf();
     return;
   }
   lastFrameAt = nowMs;
   acc = 0; let rem = Math.min(dt, 0.1); while (rem > 0.0001) { const h = Math.min(rem, 1 / 60); simulate(h); rem -= h; }
   const fdt = Math.max(1e-4, Math.min(dt, 0.1));
-  updateCamera(fdt); updateFx(Math.min(dt, 0.05)); updateCards(); updateWindHud();
+  if (inMatch()) updateCamera(fdt); updateFx(Math.min(dt, 0.05)); updateCards();
   render(fdt);
   if (S.scene === 'match') updateMatchHud();
-  updateArea(); syncSelf();
+  syncSelf();
 }
 function frame(nowMs) { requestAnimationFrame(frame); if (!document.hidden) tick(nowMs); }
 try {                                            // hidden tab: a worker drives the ticks so the match keeps running until the tab is closed
@@ -1728,13 +1560,6 @@ try {                                            // hidden tab: a worker drives 
   wk.onmessage = () => { const now = performance.now(); if (document.hidden || now - lastFrameAt > 120) tick(now, true); else if (S.booted) syncSelf(); };
 } catch (e) { setInterval(() => { const now = performance.now(); if (document.hidden || now - lastFrameAt > 120) tick(now, true); }, 100); }
 document.addEventListener('visibilitychange', () => { last = performance.now(); lastFrameAt = performance.now(); });
-function updateWindHud() {
-  const el = $('#wind'); const show = S.scene === 'lobby' && !indoors(P.x) && !menuOpen();
-  el.classList.toggle('hidden', !show); if (!show) return;
-  el.querySelector('i').style.transform = WIND.x >= 0 ? 'none' : 'scaleX(-1)';
-  const wt = 'WIND ' + Math.abs(WIND.x).toFixed(1); const we = $('#windTxt'); if (we.textContent !== wt) we.textContent = wt;
-}
-
 async function cleanupStale() {
   try {
     const t = snow();
@@ -1759,21 +1584,20 @@ async function boot(online) {
   await setLoad(30, 'Drawing icons...'); renderIcons();
   { let q = 'high'; try { q = localStorage.getItem('vg_gfx') || 'high'; } catch (e) { } applyQuality(q); $('#gfxSel').value = q; $('#gfxSel').onchange = () => { applyQuality($('#gfxSel').value); try { localStorage.setItem('vg_gfx', $('#gfxSel').value); } catch (e) { } }; }
   $('#todSel').value = TOD; $('#todSel').onchange = () => { TOD = $('#todSel').value; try { localStorage.setItem('vg_tod', TOD); } catch (e) { } updateDayNight(); };
-  $('#zoomSel').value = Math.round(LOBBY_ZOOM * 100); $('#zoomVal').textContent = Math.round(LOBBY_ZOOM * 100) + '%'; $('#zoomSel').oninput = () => { LOBBY_ZOOM = parseInt($('#zoomSel').value, 10) / 100; $('#zoomVal').textContent = Math.round(LOBBY_ZOOM * 100) + '%'; try { localStorage.setItem('vg_zoom2d', Math.round(LOBBY_ZOOM * 100)); } catch (e) { } };
   setMyRig('white');
-  if (online) { db.ref('lobbyBalls/' + SID).onDisconnect().remove(); await setLoad(60, 'Signing in...'); const ok = await resumeSession(); if (!ok) await becomeGuest(); else onIdentityChanged(); await setLoad(85, 'Joining the lobby...'); writePresence(); AREA = areaOf(P.x); subscribeLobby(); lobbyRef().set(myState()); lobbyRef().onDisconnect().remove(); }
+  if (online) { await setLoad(60, 'Signing in...'); const ok = await resumeSession(); if (!ok) await becomeGuest(); else onIdentityChanged(); await setLoad(85, 'Warming up...'); writePresence(); }
   else { me.name = 'Guest 1'; applyIdentityUI(); toast('Offline: could not reach the server. Practice and bot matches still work.', 'err', 6000); }
   $('#onlineDot').classList.toggle('on', online);
   if (online) { cleanupStale(); pruneChat(); subscribeChat(); db.ref('invites/' + SID).onDisconnect().remove(); }
   await setLoad(100, 'Ready!');
-  S.booted = true; last = performance.now(); $('#loading').classList.add('hidden'); renderKeys(); applyTouch(touchWanted()); drawAvatar(); canvas.focus();
-  toast(`Welcome, ${me.name}! Press ${keyName(KEYS.menu)} for the menu.`, 'ok', 4000);
+  S.booted = true; last = performance.now(); $('#loading').classList.add('hidden'); renderKeys(); applyTouch(touchWanted()); drawAvatar(); document.body.classList.add('inMenu'); openMenu('play');
+  toast(`Welcome, ${me.name}!`, 'ok', 3000);
 }
 let bootTimer = setTimeout(() => boot(false), 8000);
 db.ref('.info/connected').on('value', s => {
   const v = !!s.val();
   if (v && !S.booted) { clearTimeout(bootTimer); boot(true); }
-  else if (S.booted) { S.online = v; $('#onlineDot').classList.toggle('on', v); if (v) { writePresence(); if (S.scene === 'lobby') lobbyRef().onDisconnect().remove(); } }
+  else if (S.booted) { S.online = v; $('#onlineDot').classList.toggle('on', v); if (v) writePresence(); }
 });
 requestAnimationFrame(frame);
 </script>
