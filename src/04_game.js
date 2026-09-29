@@ -310,14 +310,14 @@ function spikeGeomAt(x, y, fwd) {
 }
 function spikeSolve(x, y, fwd, tz, c, mult = 1) {  // the spike (shared by players and bots): velocity + gravity at charge c and tilt tz - lob means it would have hit the net (TOO LOW)
   const { neutralPitch, clearPitch, toNet, far } = spikeGeomAt(x, y, fwd);
-  const ts = tz < 0 ? tz * 0.8 : tz;                                   // the deep shot is a little softer than the steep one - and nothing keeps it in
+  const ts = tz < 0 ? tz * 1.2 : tz;                                   // the deep (far side) shot: 1.5x its old pull - flat and high enough to wipe off the top of a block                                   // the deep shot is a little softer than the steep one - and nothing keeps it in
   const sp = (13 + 22 * Math.min(1, c)) * (ts > 0 ? lerp(1, 0.75, ts) : 1) * mult;
   let pitch = ts >= 0 ? lerp(neutralPitch, -60 * D, ts) : lerp(neutralPitch, neutralPitch * 0.25, -ts);
   if (ts < 0.35) pitch = Math.max(pitch, clearPitch);
   let g = 0.18;
   if (far > 0) {
     const gFar = lerp(0.18, 2.6, far); const gg = BALL_G * gFar;
-    const CL2 = courtL(); const R = ts >= 0 ? lerp(toNet + CL2 / 4, toNet + 1.5, ts) : lerp(toNet + CL2 / 4, toNet + CL2 / 2 + 3, -ts / 0.8 * Math.min(1, c));
+    const CL2 = courtL(); const R = ts >= 0 ? lerp(toNet + CL2 / 4, toNet + 1.5, ts) : lerp(toNet + CL2 / 4, toNet + CL2 / 2 + 3, Math.min(1.25, -ts / 0.8 * Math.min(1, c)));
     let pf = ballisticPitch(sp, gg, R, -y); if (pf === null) pf = 40 * D;
     for (let i = 0; i < 6; i++) { const t = toNet / (sp * Math.cos(pf)); const yy = y + sp * Math.sin(pf) * t - 0.5 * gg * t * t; if (yy >= NET_H + 0.4) break; pf += 4 * D; }
     pitch = lerp(pitch, pf, Math.min(1, far / 0.3)); g = gFar;
@@ -333,7 +333,7 @@ function serveSolve(bx, by, fwd, c, tz, mult) {  // a jump serve: your spike pow
   let gs = lerp(1, 2.0, cc), pitch = lerp(20, 5, cc) * D;
   const toNet = netAhead(bx, fwd); const CL = courtL(); const aimed = isFinite(toNet) && toNet < 40;
   let R = aimed ? lerp(toNet + CL / 4 + 1, toNet + CL / 2 - 1.2, cc) : 14 + 10 * cc;
-  if (aimed) R = tz >= 0 ? lerp(R, toNet + 3, tz * 0.55) : R + -tz * 0.8 * 4.5;
+  if (aimed) R = tz >= 0 ? lerp(R, toNet + 3, tz * 0.55) : R + -tz * 1.2 * 4.5;
   for (let k = 0; k < 12; k++) {
     const gg = BALL_G * gs; const p0 = ballisticPitch(ss, gg, R, -by); if (p0 === null) break; pitch = p0;
     if (aimed) for (let i = 0; i < 8; i++) { const t = toNet / (ss * Math.cos(pitch)); const y = by + ss * Math.sin(pitch) * t - 0.5 * gg * t * t; if (y >= NET_H + 0.4) break; pitch += 3 * D; }
