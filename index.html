@@ -1805,7 +1805,7 @@ function payForPass(b, kind, team = P.team, L = stat('set')) {
 function receiveBreak(team = P.team) {           // 0% stamina: the pass breaks and the ball flies back the way it was going
   const b = B; if (!inRealMatch() || teamStamina(team) > 0.001) return false;
   const first = b.sideTeam !== team || b.touches === 0; if (!first) return false;
-  const sp = Math.hypot(b.vx, b.vy); const away = -netFrom(b.x); const k = 0.4 + Math.random() * 0.25; const pitch = (30 + Math.random() * 25) * D;
+  const sp = Math.hypot(b.vx, b.vy); const away = -netFrom(b.x); const k = 0.22 + Math.random() * 0.13; const pitch = (30 + Math.random() * 25) * D;
   hitBall('bump', away * Math.cos(pitch) * sp * k, Math.sin(pitch) * sp * k + 3, 1); showBallMsg('RECEIVE BREAK', b); camKick(0.05, 5);
   return true;
 }
@@ -1888,7 +1888,7 @@ function blockTouch(b, bx, by, f, nd, lean, L) {
   if (f !== nd) return { vx: -nd * Math.max(24, sp * 0.8 + 10), vy: 14, g: 0.6, kind: 'WIPE' };
   const hx = bx + f * (0.3 + lean * 0.9) * PS, hy = by + 2.25 * PS;
   const fwd = (b.x - hx) * nd, up = b.y - hy;
-  if (up > 0.15 * PS && up > Math.abs(fwd) * 0.6) return { vx: -nd * (sp * 0.55 + 1), vy: sp * 0.35 + 5, g: 1, kind: 'WIPE' };
+  if (up > 0.15 * PS && up > Math.abs(fwd) * 0.6) return { vx: -nd * (sp * 0.25 + 1), vy: sp * 0.08 + 3, g: 1, kind: 'WIPE' };   // a hard spike's wipe lands a little past the back line
   if (fwd >= -0.05 && lean > 0.08) { const r = blockSolve(b, bx, nd, clamp(lean / BLOCK_LEAN, 0.3, 1), L); r.kind = sp >= 12 ? 'KILL BLOCK' : ''; return r; }
   const r = blockSolve(b, bx, nd, -1, L); r.kind = ''; return r;
 }
@@ -3117,7 +3117,7 @@ function planTeam(team, bots) {
       if (recv && recv.readSeq !== b.seq) { recv.readSeq = b.seq; const sp = Math.hypot(b.vx, b.vy); recv.misread = b.hitType === 'spike' && Math.random() < clamp((sp - 20) / 45, 0, 0.35) * ({ easy: 1, medium: 0.55, hard: 0.25 })[botLevel]; }
       if (recv && recv.misread) recv.target = land - s * 1.6;
       if (recv && !recv.misread && botReach(recv, false) && botMayTouch(recv) && (b.vy < 1 || b.y < 1.6 * PS)) {   // touch 1: a high floaty pass to the setter spot
-        if (teamStamina(team) <= 0.001) { const sp = Math.hypot(b.vx, b.vy), k = 0.4 + Math.random() * 0.25, pitch = (30 + Math.random() * 25) * D; botHit(recv, 'bump', s * Math.cos(pitch) * sp * k, Math.sin(pitch) * sp * k + 3, 1); showBallMsg('RECEIVE BREAK', b); recv.plan = 'wait'; return; }   // 0% stamina: the pass breaks
+        if (teamStamina(team) <= 0.001) { const sp = Math.hypot(b.vx, b.vy), k = 0.22 + Math.random() * 0.13, pitch = (30 + Math.random() * 25) * D; botHit(recv, 'bump', s * Math.cos(pitch) * sp * k, Math.sin(pitch) * sp * k + 3, 1); showBallMsg('RECEIVE BREAK', b); recv.plan = 'wait'; return; }   // 0% stamina: the pass breaks
         const sc = botPass(recv, 'bump');
         const v = launchTo(b.x, b.y, setterSpot(team) + randn() * sc, 0, Math.max(10, b.y + 5), BALL_G * BUMP_G);
         botHit(recv, 'bump', v.x, v.y, BUMP_G);
