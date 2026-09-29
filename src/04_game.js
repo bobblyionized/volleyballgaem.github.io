@@ -1418,6 +1418,7 @@ function showSpikeInfo(vx, vy, y) {
   $('#spikeSpd').innerHTML = `${ki}<small>.${kf} km/h</small>`; $('#spikeHt').innerHTML = `${mi}<small>.${mf} m</small>`;
   $('#spikeInfo').classList.add('on'); spikeInfoT = T + 2.6;
   const b = matchBall(); if (b && kmh > TRAIL_KMH) startTrail(b, kmh > TRAIL_HOT_KMH);
+  if (b && kmh > TRAIL_HOT_KMH) { impactFrame(b.x, b.y, 3); camKick(0.12, 6); }   // over 200 km/h: impact frames
 }
 function updateMatchHud() {
   if (spikeInfoT && T > spikeInfoT) { spikeInfoT = 0; $('#spikeInfo').classList.remove('on'); }
